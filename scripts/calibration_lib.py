@@ -175,7 +175,10 @@ def setup_lcio_reader(collection_names: Sequence[str]):
 
 
 def mcp_eta(mcp) -> float:
-    px, py, pz = mcp.getMomentum()
+    momentum = mcp.getMomentum()
+    px = float(momentum[0])
+    py = float(momentum[1])
+    pz = float(momentum[2])
     p = math.sqrt(px * px + py * py + pz * pz)
     if p <= 0.0:
         return 999.0
@@ -188,7 +191,10 @@ def mcp_eta(mcp) -> float:
 
 
 def mcp_theta(mcp) -> float:
-    px, py, pz = mcp.getMomentum()
+    momentum = mcp.getMomentum()
+    px = float(momentum[0])
+    py = float(momentum[1])
+    pz = float(momentum[2])
     p = math.sqrt(px * px + py * py + pz * pz)
     if p <= 0.0:
         return 0.0
