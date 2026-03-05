@@ -92,8 +92,15 @@ python3 scripts/validate_theta_energy_calibration.py \
   --inputs /scratch/trholmes/mucol/data/reco \
   --ecal-calibration calib/ecal_theta_energy_calib.json \
   --hcal-calibration calib/hcal_theta_energy_calib.json \
+  --plot-dir calib/plots \
   --output calib/calibration_closure_summary.json
 ```
+
+This also writes quick-look calibration plots when `--plot-dir` is provided:
+- `ecal_scale_map.png`, `hcal_scale_map.png`
+- `ecal_count_map.png`, `hcal_count_map.png`
+- `ecal_theta_profiles.png`, `hcal_theta_profiles.png`
+- plus ROOT files with the same histograms
 
 ### 4) Build steering payload
 
