@@ -146,7 +146,9 @@ def _plot_table(table, out_dir):
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--inputs", nargs="+", required=True)
+    parser.add_argument("--inputs", nargs="+", default=[], help="Fallback inputs used for both ECAL and HCAL validation.")
+    parser.add_argument("--ecal-inputs", nargs="+", default=[], help="Inputs used for ECAL closure validation.")
+    parser.add_argument("--hcal-inputs", nargs="+", default=[], help="Inputs used for HCAL and total closure validation.")
     parser.add_argument("--file-glob", default="*.slcio")
     parser.add_argument("--recursive", action="store_true")
     parser.add_argument("--max-events", type=int, default=-1)
@@ -169,9 +171,17 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    files = expand_input_paths(args.inputs, args.file_glob, recursive=args.recursive)
-    if not files:
-        raise RuntimeError("No input files found.")
+    ecal_inputs = args.ecal_inputs if args.ecal_inputs else args.inputs
+    hcal_inputs = args.hcal_inputs if args.hcal_inputs else args.inputs
+    if not ecal_inputs and not hcal_inputs:
+        raise RuntimeError("No input paths provided. Use --inputs or --ecal-inputs/--hcal-inputs.")
+
+    ecal_files = expand_input_paths(ecal_inputs, args.file_glob, recursive=args.recursive)
+    hcal_files = expand_input_paths(hcal_inputs, args.file_glob, recursive=args.recursive)
+    if not ecal_files:
+        raise RuntimeError("No ECAL input files found.")
+    if not hcal_files:
+        raise RuntimeError("No HCAL input files found.")
 
     ecal_table = load_table_json(args.ecal_calibration)
     hcal_table = load_table_json(args.hcal_calibration)
@@ -188,26 +198,23 @@ def main() -> int:
         ]
     )
 
-    events_total = 0
+    events_total_ecal = 0
+    events_total_hcal = 0
     ecal_closure = []
     hcal_closure = []
     total_closure = []
     t0 = time.time()
 
-    for fname in files:
+    for fname in ecal_files:
         reader.open(fname)
         for event in reader:
-            if args.max_events > 0 and events_total >= args.max_events:
+            if args.max_events > 0 and events_total_ecal >= args.max_events:
                 break
-            events_total += 1
+            events_total_ecal += 1
 
             ecal_measured = (
                 sum_collection_energy(event, args.ecal_barrel_collection)
                 + sum_collection_energy(event, args.ecal_endcap_collection)
-            )
-            hcal_measured = (
-                sum_collection_energy(event, args.hcal_barrel_collection)
-                + sum_collection_energy(event, args.hcal_endcap_collection)
             )
 
             mcp_ecal = find_single_primary(
@@ -222,7 +229,25 @@ def main() -> int:
                 ecal_corr = ecal_table.lookup(theta, truth_e) * ecal_measured
                 if ecal_corr > 0.0:
                     ecal_closure.append(truth_e / ecal_corr)
+        reader.close()
+        if args.max_events > 0 and events_total_ecal >= args.max_events:
+            break
 
+    for fname in hcal_files:
+        reader.open(fname)
+        for event in reader:
+            if args.max_events > 0 and events_total_hcal >= args.max_events:
+                break
+            events_total_hcal += 1
+
+            ecal_measured = (
+                sum_collection_energy(event, args.ecal_barrel_collection)
+                + sum_collection_energy(event, args.ecal_endcap_collection)
+            )
+            hcal_measured = (
+                sum_collection_energy(event, args.hcal_barrel_collection)
+                + sum_collection_energy(event, args.hcal_endcap_collection)
+            )
             mcp_hcal = find_single_primary(
                 event.getCollection(args.mc_collection),
                 pdg_ids=hcal_pdgs,
@@ -242,18 +267,22 @@ def main() -> int:
                 if total_corr > 0.0:
                     total_closure.append(truth_e / total_corr)
         reader.close()
-        if args.max_events > 0 and events_total >= args.max_events:
+        if args.max_events > 0 and events_total_hcal >= args.max_events:
             break
 
     summary = {
         "created_unix": int(time.time()),
         "runtime_sec": round(time.time() - t0, 3),
-        "events_total": events_total,
-        "files": len(files),
+        "events_total_ecal": events_total_ecal,
+        "events_total_hcal": events_total_hcal,
+        "files_ecal": len(ecal_files),
+        "files_hcal": len(hcal_files),
         "ecal_closure_truth_over_corrected": summarize(ecal_closure),
         "hcal_closure_target_over_corrected": summarize(hcal_closure),
         "total_closure_truth_over_corrected": summarize(total_closure),
         "inputs": {
+            "ecal_inputs": ecal_inputs,
+            "hcal_inputs": hcal_inputs,
             "ecal_calibration": args.ecal_calibration,
             "hcal_calibration": args.hcal_calibration,
             "ecal_pdg_ids": ecal_pdgs,

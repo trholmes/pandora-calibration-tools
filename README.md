@@ -91,7 +91,8 @@ python3 scripts/make_hcal_theta_energy_calibration.py \
 
 ```bash
 python3 scripts/validate_theta_energy_calibration.py \
-  --inputs /scratch/trholmes/mucol/data/reco \
+  --ecal-inputs /data/fmeloni/DataMuC_MAIA_v0/v6/reco/photonGun_E_0_50 \
+  --hcal-inputs /data/fmeloni/DataMuC_MAIA_v0/v6/reco/neutronGun_E_0_50 \
   --recursive \
   --ecal-calibration calib/ecal_theta_energy_calib.json \
   --hcal-calibration calib/hcal_theta_energy_calib.json \
@@ -152,7 +153,8 @@ To make this whole chain testable end-to-end on remote:
    - source your MuonCollider/ILCSoft environment before running scripts.
 2. `No input files found`:
    - check `--inputs` path and `--file-glob`,
-   - add `--recursive` when files are in nested subdirectories.
+   - add `--recursive` when files are in nested subdirectories,
+   - for closure use `--ecal-inputs` and `--hcal-inputs` when ECAL and HCAL validation samples are in different directories.
 3. Too many bins with scale `1.0`:
    - increase statistics or reduce bin granularity,
    - lower `--min-bin-count`.
