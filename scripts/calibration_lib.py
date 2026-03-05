@@ -243,6 +243,45 @@ def sum_collection_energy(event, name: str) -> float:
     return sum(hit.getEnergy() for hit in collection)
 
 
+def get_best_cluster(event, cluster_collection: str):
+    try:
+        collection = event.getCollection(cluster_collection)
+    except Exception:
+        return None
+    if collection.getNumberOfElements() <= 0:
+        return None
+    best = None
+    best_energy = -1.0
+    for i in range(collection.getNumberOfElements()):
+        cluster = collection.getElementAt(i)
+        energy = float(cluster.getEnergy())
+        if energy > best_energy:
+            best_energy = energy
+            best = cluster
+    return best
+
+
+def get_cluster_energy_split(cluster, ecal_index: int = 0, hcal_index: int = 1):
+    """Return (total, ecal, hcal, has_split)."""
+    total = float(cluster.getEnergy())
+    values: List[float] = []
+    if hasattr(cluster, "getSubdetectorEnergies"):
+        sub = cluster.getSubdetectorEnergies()
+        try:
+            n = len(sub)
+            values = [float(sub[i]) for i in range(n)]
+        except Exception:
+            try:
+                values = [float(x) for x in sub]
+            except Exception:
+                values = []
+    max_idx = max(ecal_index, hcal_index)
+    has_split = len(values) > max_idx
+    ecal = float(values[ecal_index]) if len(values) > ecal_index else 0.0
+    hcal = float(values[hcal_index]) if len(values) > hcal_index else 0.0
+    return total, ecal, hcal, has_split
+
+
 def add_common_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--inputs",

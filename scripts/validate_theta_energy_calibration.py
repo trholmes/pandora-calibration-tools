@@ -13,6 +13,8 @@ import time
 from calibration_lib import (
     expand_input_paths,
     find_single_primary,
+    get_best_cluster,
+    get_cluster_energy_split,
     load_table_json,
     mcp_theta,
     parse_int_list,
@@ -155,6 +157,11 @@ def main() -> int:
     parser.add_argument("--eta-max", type=float, default=2.436)
     parser.add_argument("--require-single-primary", action="store_true")
     parser.add_argument("--mc-collection", default="MCParticle")
+    parser.add_argument("--energy-source", choices=["clusters", "hits"], default="clusters")
+    parser.add_argument("--cluster-collection", default="PandoraClusters")
+    parser.add_argument("--ecal-subdet-index", type=int, default=0)
+    parser.add_argument("--hcal-subdet-index", type=int, default=1)
+    parser.add_argument("--skip-missing-subdet-split", action="store_true")
     parser.add_argument("--ecal-barrel-collection", default="ECalBarrelCollection")
     parser.add_argument("--ecal-endcap-collection", default="ECalEndcapCollection")
     parser.add_argument("--hcal-barrel-collection", default="HCalBarrelCollection")
@@ -191,6 +198,7 @@ def main() -> int:
     reader = setup_lcio_reader(
         [
             args.mc_collection,
+            args.cluster_collection,
             args.ecal_barrel_collection,
             args.ecal_endcap_collection,
             args.hcal_barrel_collection,
@@ -212,10 +220,21 @@ def main() -> int:
                 break
             events_total_ecal += 1
 
-            ecal_measured = (
-                sum_collection_energy(event, args.ecal_barrel_collection)
-                + sum_collection_energy(event, args.ecal_endcap_collection)
-            )
+            if args.energy_source == "clusters":
+                cluster = get_best_cluster(event, args.cluster_collection)
+                if cluster is None:
+                    continue
+                total, ecal_e, _hcal_e, has_split = get_cluster_energy_split(
+                    cluster, ecal_index=args.ecal_subdet_index, hcal_index=args.hcal_subdet_index
+                )
+                if args.skip_missing_subdet_split and not has_split:
+                    continue
+                ecal_measured = ecal_e
+            else:
+                ecal_measured = (
+                    sum_collection_energy(event, args.ecal_barrel_collection)
+                    + sum_collection_energy(event, args.ecal_endcap_collection)
+                )
 
             mcp_ecal = find_single_primary(
                 event.getCollection(args.mc_collection),
@@ -240,14 +259,26 @@ def main() -> int:
                 break
             events_total_hcal += 1
 
-            ecal_measured = (
-                sum_collection_energy(event, args.ecal_barrel_collection)
-                + sum_collection_energy(event, args.ecal_endcap_collection)
-            )
-            hcal_measured = (
-                sum_collection_energy(event, args.hcal_barrel_collection)
-                + sum_collection_energy(event, args.hcal_endcap_collection)
-            )
+            if args.energy_source == "clusters":
+                cluster = get_best_cluster(event, args.cluster_collection)
+                if cluster is None:
+                    continue
+                _total, ecal_e, hcal_e, has_split = get_cluster_energy_split(
+                    cluster, ecal_index=args.ecal_subdet_index, hcal_index=args.hcal_subdet_index
+                )
+                if args.skip_missing_subdet_split and not has_split:
+                    continue
+                ecal_measured = ecal_e
+                hcal_measured = hcal_e
+            else:
+                ecal_measured = (
+                    sum_collection_energy(event, args.ecal_barrel_collection)
+                    + sum_collection_energy(event, args.ecal_endcap_collection)
+                )
+                hcal_measured = (
+                    sum_collection_energy(event, args.hcal_barrel_collection)
+                    + sum_collection_energy(event, args.hcal_endcap_collection)
+                )
             mcp_hcal = find_single_primary(
                 event.getCollection(args.mc_collection),
                 pdg_ids=hcal_pdgs,
@@ -287,6 +318,11 @@ def main() -> int:
             "hcal_calibration": args.hcal_calibration,
             "ecal_pdg_ids": ecal_pdgs,
             "hcal_pdg_ids": hcal_pdgs,
+            "energy_source": args.energy_source,
+            "cluster_collection": args.cluster_collection,
+            "ecal_subdet_index": args.ecal_subdet_index,
+            "hcal_subdet_index": args.hcal_subdet_index,
+            "skip_missing_subdet_split": bool(args.skip_missing_subdet_split),
         },
     }
 

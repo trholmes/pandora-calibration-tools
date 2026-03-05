@@ -13,6 +13,8 @@ from calibration_lib import (
     find_bin,
     find_single_primary,
     flatten_index,
+    get_best_cluster,
+    get_cluster_energy_split,
     load_table_json,
     mcp_theta,
     parse_float_list,
@@ -28,6 +30,12 @@ def main() -> int:
     add_common_args(parser)
     parser.add_argument("--pdg-ids", default="2112,211,111", help="Comma-separated PDG IDs for HCAL training.")
     parser.add_argument("--mc-collection", default="MCParticle")
+    parser.add_argument("--energy-source", choices=["clusters", "hits"], default="clusters")
+    parser.add_argument("--cluster-collection", default="PandoraClusters")
+    parser.add_argument("--ecal-subdet-index", type=int, default=0)
+    parser.add_argument("--hcal-subdet-index", type=int, default=1)
+    parser.add_argument("--hcal-fraction-min", type=float, default=0.0)
+    parser.add_argument("--skip-missing-subdet-split", action="store_true")
     parser.add_argument("--ecal-barrel-collection", default="ECalBarrelCollection")
     parser.add_argument("--ecal-endcap-collection", default="ECalEndcapCollection")
     parser.add_argument("--hcal-barrel-collection", default="HCalBarrelCollection")
@@ -69,6 +77,7 @@ def main() -> int:
     reader = setup_lcio_reader(
         [
             args.mc_collection,
+            args.cluster_collection,
             args.ecal_barrel_collection,
             args.ecal_endcap_collection,
             args.hcal_barrel_collection,
@@ -78,6 +87,8 @@ def main() -> int:
 
     events_total = 0
     events_used = 0
+    events_skipped_split = 0
+    events_skipped_fraction = 0
     t0 = time.time()
 
     for fname in files:
@@ -98,14 +109,31 @@ def main() -> int:
 
             truth_e = mcp.getEnergy()
             theta = mcp_theta(mcp)
-            ecal_measured = (
-                sum_collection_energy(event, args.ecal_barrel_collection)
-                + sum_collection_energy(event, args.ecal_endcap_collection)
-            )
-            hcal_measured = (
-                sum_collection_energy(event, args.hcal_barrel_collection)
-                + sum_collection_energy(event, args.hcal_endcap_collection)
-            )
+            if args.energy_source == "clusters":
+                cluster = get_best_cluster(event, args.cluster_collection)
+                if cluster is None:
+                    continue
+                total, ecal_e, hcal_e, has_split = get_cluster_energy_split(
+                    cluster, ecal_index=args.ecal_subdet_index, hcal_index=args.hcal_subdet_index
+                )
+                if args.skip_missing_subdet_split and not has_split:
+                    events_skipped_split += 1
+                    continue
+                hcal_fraction = (hcal_e / total) if total > 0.0 else 0.0
+                if hcal_fraction < args.hcal_fraction_min:
+                    events_skipped_fraction += 1
+                    continue
+                ecal_measured = ecal_e
+                hcal_measured = hcal_e
+            else:
+                ecal_measured = (
+                    sum_collection_energy(event, args.ecal_barrel_collection)
+                    + sum_collection_energy(event, args.ecal_endcap_collection)
+                )
+                hcal_measured = (
+                    sum_collection_energy(event, args.hcal_barrel_collection)
+                    + sum_collection_energy(event, args.hcal_endcap_collection)
+                )
             if hcal_measured <= 0.0:
                 continue
 
@@ -151,8 +179,16 @@ def main() -> int:
             "files": len(files),
             "events_total": events_total,
             "events_used": events_used,
+            "events_skipped_split": events_skipped_split,
+            "events_skipped_fraction": events_skipped_fraction,
             "pdg_ids": pdg_ids,
             "mc_collection": args.mc_collection,
+            "energy_source": args.energy_source,
+            "cluster_collection": args.cluster_collection,
+            "ecal_subdet_index": args.ecal_subdet_index,
+            "hcal_subdet_index": args.hcal_subdet_index,
+            "hcal_fraction_min": args.hcal_fraction_min,
+            "skip_missing_subdet_split": bool(args.skip_missing_subdet_split),
             "ecal_collections": [args.ecal_barrel_collection, args.ecal_endcap_collection],
             "hcal_collections": [args.hcal_barrel_collection, args.hcal_endcap_collection],
             "ecal_calibration": args.ecal_calibration,

@@ -4,6 +4,10 @@ Standalone tooling to produce ECAL/HCAL theta-energy calibration tables and conv
 
 This repo is intentionally independent from your larger software stack so you can clone and run it inside your remote container.
 
+Default calibration source in scripts is **cluster-based** (`PandoraClusters`) using cluster subdetector energy split:
+- ECAL subdetector index: `0`
+- HCAL subdetector index: `1`
+
 ## Included Spec
 
 Full design/specification is included here:
@@ -68,6 +72,10 @@ mkdir -p calib
 python3 scripts/make_ecal_theta_energy_calibration.py \
   --inputs /scratch/trholmes/mucol/data/reco/photonGun_E_0_50 \
   --recursive \
+  --energy-source clusters \
+  --cluster-collection PandoraClusters \
+  --skip-missing-subdet-split \
+  --ecal-fraction-min 0.7 \
   --theta-bins 0,0.35,0.7,1.05,1.4,1.75,2.1,2.45,2.8,3.14159 \
   --energy-bins 0,5,10,20,50,100,200,500,1000,5000 \
   --pdg-ids 22 \
@@ -80,6 +88,10 @@ python3 scripts/make_ecal_theta_energy_calibration.py \
 python3 scripts/make_hcal_theta_energy_calibration.py \
   --inputs /scratch/trholmes/mucol/data/reco/neutronGun_E_250_1000 \
   --recursive \
+  --energy-source clusters \
+  --cluster-collection PandoraClusters \
+  --skip-missing-subdet-split \
+  --hcal-fraction-min 0.1 \
   --theta-bins 0,0.35,0.7,1.05,1.4,1.75,2.1,2.45,2.8,3.14159 \
   --energy-bins 0,5,10,20,50,100,200,500,1000,5000 \
   --pdg-ids 2112,211,111 \
@@ -94,6 +106,9 @@ python3 scripts/validate_theta_energy_calibration.py \
   --ecal-inputs /data/fmeloni/DataMuC_MAIA_v0/v6/reco/photonGun_E_0_50 \
   --hcal-inputs /data/fmeloni/DataMuC_MAIA_v0/v6/reco/neutronGun_E_0_50 \
   --recursive \
+  --energy-source clusters \
+  --cluster-collection PandoraClusters \
+  --skip-missing-subdet-split \
   --ecal-calibration calib/ecal_theta_energy_calib.json \
   --hcal-calibration calib/hcal_theta_energy_calib.json \
   --plot-dir calib/plots \
@@ -158,3 +173,6 @@ To make this whole chain testable end-to-end on remote:
 3. Too many bins with scale `1.0`:
    - increase statistics or reduce bin granularity,
    - lower `--min-bin-count`.
+4. Cluster split not available:
+   - if `PandoraClusters` in your file does not provide subdetector split, remove `--skip-missing-subdet-split` and test,
+   - or temporarily switch to `--energy-source hits` for debugging.
