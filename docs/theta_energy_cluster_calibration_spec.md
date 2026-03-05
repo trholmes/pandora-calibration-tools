@@ -1,5 +1,7 @@
 # Theta-Energy Cluster Calibration Spec (Mid-Pandora)
 
+Note: this document was originally drafted in a multi-repo workspace. Some file links point to absolute local paths from that environment; use the referenced filenames/components as canonical targets.
+
 ## Objective
 
 Implement **cluster-level** calorimeter calibrations that depend on both cluster polar angle (`theta`) and cluster energy (`E`), applied **after clustering** and **before final PFO energy assignment**.
