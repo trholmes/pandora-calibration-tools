@@ -1,0 +1,12 @@
+# Example CLI values for scripts/make_ecal_theta_energy_calibration.py
+# (Use as a checklist; pass these as command-line arguments.)
+
+--theta-bins 0,0.35,0.7,1.05,1.4,1.75,2.1,2.45,2.8,3.14159
+--energy-bins 0,5,10,20,50,100,200,500,1000,5000
+--pdg-ids 22
+--mc-collection MCParticle
+--ecal-barrel-collection ECalBarrelCollection
+--ecal-endcap-collection ECalEndcapCollection
+--energy-axis truth
+--estimator median
+--min-bin-count 20
