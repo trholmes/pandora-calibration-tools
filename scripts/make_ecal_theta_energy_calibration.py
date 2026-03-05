@@ -41,7 +41,7 @@ def main() -> int:
     theta_edges = parse_float_list(args.theta_bins)
     energy_edges = parse_float_list(args.energy_bins)
     pdg_ids = parse_int_list(args.pdg_ids)
-    files = expand_input_paths(args.inputs, args.file_glob)
+    files = expand_input_paths(args.inputs, args.file_glob, recursive=args.recursive)
     if not files:
         raise RuntimeError("No input files found.")
 

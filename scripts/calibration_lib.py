@@ -46,18 +46,28 @@ def flatten_index(i_theta: int, i_energy: int, n_energy_bins: int) -> int:
     return i_theta * n_energy_bins + i_energy
 
 
-def expand_input_paths(inputs: Sequence[str], file_glob: str) -> List[str]:
+def expand_input_paths(inputs: Sequence[str], file_glob: str, recursive: bool = False) -> List[str]:
     files: List[str] = []
+
+    def add_from_directory(directory: str) -> None:
+        pattern = os.path.join(directory, "**", file_glob) if recursive else os.path.join(directory, file_glob)
+        files.extend(glob.glob(pattern, recursive=recursive))
+
     for item in inputs:
         if any(c in item for c in "*?[]"):
-            files.extend(glob.glob(item))
+            matches = glob.glob(item)
+            for m in matches:
+                if os.path.isdir(m):
+                    add_from_directory(m)
+                elif os.path.isfile(m):
+                    files.append(m)
             continue
         if os.path.isdir(item):
-            files.extend(glob.glob(os.path.join(item, file_glob)))
+            add_from_directory(item)
             continue
         if os.path.isfile(item):
             files.append(item)
-    files = sorted(set(files))
+    files = sorted(set([f for f in files if os.path.isfile(f)]))
     return files
 
 
@@ -241,6 +251,11 @@ def add_common_args(parser: argparse.ArgumentParser) -> None:
         help="Input files/directories/globs. Directories are expanded with --file-glob.",
     )
     parser.add_argument("--file-glob", default="*.slcio", help="Glob used when an input is a directory.")
+    parser.add_argument(
+        "--recursive",
+        action="store_true",
+        help="Recursively search directory inputs using **/<file-glob>.",
+    )
     parser.add_argument("--max-events", type=int, default=-1, help="Maximum events to process (-1 = all).")
     parser.add_argument("--eta-max", type=float, default=2.436, help="Truth particle acceptance cut.")
     parser.add_argument(

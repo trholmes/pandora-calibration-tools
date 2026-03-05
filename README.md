@@ -67,6 +67,7 @@ mkdir -p calib
 ```bash
 python3 scripts/make_ecal_theta_energy_calibration.py \
   --inputs /scratch/trholmes/mucol/data/reco/photonGun_E_0_50 \
+  --recursive \
   --theta-bins 0,0.35,0.7,1.05,1.4,1.75,2.1,2.45,2.8,3.14159 \
   --energy-bins 0,5,10,20,50,100,200,500,1000,5000 \
   --pdg-ids 22 \
@@ -78,6 +79,7 @@ python3 scripts/make_ecal_theta_energy_calibration.py \
 ```bash
 python3 scripts/make_hcal_theta_energy_calibration.py \
   --inputs /scratch/trholmes/mucol/data/reco/neutronGun_E_250_1000 \
+  --recursive \
   --theta-bins 0,0.35,0.7,1.05,1.4,1.75,2.1,2.45,2.8,3.14159 \
   --energy-bins 0,5,10,20,50,100,200,500,1000,5000 \
   --pdg-ids 2112,211,111 \
@@ -90,6 +92,7 @@ python3 scripts/make_hcal_theta_energy_calibration.py \
 ```bash
 python3 scripts/validate_theta_energy_calibration.py \
   --inputs /scratch/trholmes/mucol/data/reco \
+  --recursive \
   --ecal-calibration calib/ecal_theta_energy_calib.json \
   --hcal-calibration calib/hcal_theta_energy_calib.json \
   --plot-dir calib/plots \
@@ -148,7 +151,8 @@ To make this whole chain testable end-to-end on remote:
 1. `ImportError: pyLCIO`:
    - source your MuonCollider/ILCSoft environment before running scripts.
 2. `No input files found`:
-   - check `--inputs` path and `--file-glob`.
+   - check `--inputs` path and `--file-glob`,
+   - add `--recursive` when files are in nested subdirectories.
 3. Too many bins with scale `1.0`:
    - increase statistics or reduce bin granularity,
    - lower `--min-bin-count`.

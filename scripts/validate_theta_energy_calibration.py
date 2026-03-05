@@ -148,6 +148,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--inputs", nargs="+", required=True)
     parser.add_argument("--file-glob", default="*.slcio")
+    parser.add_argument("--recursive", action="store_true")
     parser.add_argument("--max-events", type=int, default=-1)
     parser.add_argument("--eta-max", type=float, default=2.436)
     parser.add_argument("--require-single-primary", action="store_true")
@@ -168,7 +169,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    files = expand_input_paths(args.inputs, args.file_glob)
+    files = expand_input_paths(args.inputs, args.file_glob, recursive=args.recursive)
     if not files:
         raise RuntimeError("No input files found.")
 
