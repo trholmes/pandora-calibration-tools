@@ -43,14 +43,14 @@ def main() -> int:
     parser.add_argument("--ecal-calibration", required=True, help="ECAL calibration JSON from pass A.")
     parser.add_argument(
         "--ecal-lookup-energy",
-        choices=["truth", "measured"],
+        choices=["measured"],
         default="measured",
         help="Energy argument used for ECAL table lookup.",
     )
     parser.add_argument(
         "--hcal-energy-axis",
-        choices=["target", "truth", "measured"],
-        default="target",
+        choices=["measured"],
+        default="measured",
         help="Energy value used for HCAL theta-energy binning.",
     )
     parser.add_argument(
@@ -137,8 +137,7 @@ def main() -> int:
             if hcal_measured <= 0.0:
                 continue
 
-            ecal_lookup_energy = truth_e if args.ecal_lookup_energy == "truth" else ecal_measured
-            ecal_scale = ecal_table.lookup(theta, ecal_lookup_energy)
+            ecal_scale = ecal_table.lookup(theta, ecal_measured)
             ecal_corrected = ecal_scale * ecal_measured
             target_hcal = truth_e - ecal_corrected
             if target_hcal <= 0.0:
@@ -149,12 +148,7 @@ def main() -> int:
                 continue
 
             ratio = target_hcal / hcal_measured
-            if args.hcal_energy_axis == "target":
-                energy_axis_value = target_hcal
-            elif args.hcal_energy_axis == "truth":
-                energy_axis_value = truth_e
-            else:
-                energy_axis_value = hcal_measured
+            energy_axis_value = hcal_measured
 
             i_theta = find_bin(theta_edges, theta)
             i_energy = find_bin(energy_edges, energy_axis_value)
@@ -192,8 +186,8 @@ def main() -> int:
             "ecal_collections": [args.ecal_barrel_collection, args.ecal_endcap_collection],
             "hcal_collections": [args.hcal_barrel_collection, args.hcal_endcap_collection],
             "ecal_calibration": args.ecal_calibration,
-            "ecal_lookup_energy": args.ecal_lookup_energy,
-            "hcal_energy_axis": args.hcal_energy_axis,
+            "ecal_lookup_energy": "measured",
+            "hcal_energy_axis": "measured",
             "negative_target_policy": args.negative_target_policy,
             "runtime_sec": round(time.time() - t0, 3),
         },

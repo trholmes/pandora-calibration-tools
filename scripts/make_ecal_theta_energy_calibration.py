@@ -39,8 +39,8 @@ def main() -> int:
     parser.add_argument("--ecal-endcap-collection", default="ECalEndcapCollection")
     parser.add_argument(
         "--energy-axis",
-        choices=["truth", "measured"],
-        default="truth",
+        choices=["measured"],
+        default="measured",
         help="Choose binning energy axis value.",
     )
     parser.add_argument("--output", required=True, help="Output calibration JSON path.")
@@ -113,7 +113,7 @@ def main() -> int:
                 continue
 
             ratio = truth_e / ecal_measured
-            energy_axis_value = truth_e if args.energy_axis == "truth" else ecal_measured
+            energy_axis_value = ecal_measured
             i_theta = find_bin(theta_edges, theta)
             i_energy = find_bin(energy_edges, energy_axis_value)
             if i_theta < 0 or i_energy < 0:
@@ -148,7 +148,7 @@ def main() -> int:
             "ecal_fraction_min": args.ecal_fraction_min,
             "skip_missing_subdet_split": bool(args.skip_missing_subdet_split),
             "ecal_collections": [args.ecal_barrel_collection, args.ecal_endcap_collection],
-            "energy_axis": args.energy_axis,
+            "energy_axis": "measured",
             "runtime_sec": round(time.time() - t0, 3),
         },
     )

@@ -245,7 +245,7 @@ def main() -> int:
             if mcp_ecal is not None and ecal_measured > 0.0:
                 truth_e = mcp_ecal.getEnergy()
                 theta = mcp_theta(mcp_ecal)
-                ecal_corr = ecal_table.lookup(theta, truth_e) * ecal_measured
+                ecal_corr = ecal_table.lookup(theta, ecal_measured) * ecal_measured
                 if ecal_corr > 0.0:
                     ecal_closure.append(truth_e / ecal_corr)
         reader.close()
@@ -288,13 +288,13 @@ def main() -> int:
             if mcp_hcal is not None and hcal_measured > 0.0:
                 truth_e = mcp_hcal.getEnergy()
                 theta = mcp_theta(mcp_hcal)
-                ecal_corr = ecal_table.lookup(theta, truth_e) * ecal_measured
+                ecal_corr = ecal_table.lookup(theta, ecal_measured) * ecal_measured
                 target_hcal = truth_e - ecal_corr
                 if target_hcal > 0.0:
-                    hcal_corr = hcal_table.lookup(theta, target_hcal) * hcal_measured
+                    hcal_corr = hcal_table.lookup(theta, hcal_measured) * hcal_measured
                     if hcal_corr > 0.0:
                         hcal_closure.append(target_hcal / hcal_corr)
-                total_corr = ecal_corr + hcal_table.lookup(theta, truth_e) * hcal_measured
+                total_corr = ecal_corr + hcal_table.lookup(theta, hcal_measured) * hcal_measured
                 if total_corr > 0.0:
                     total_closure.append(truth_e / total_corr)
         reader.close()
