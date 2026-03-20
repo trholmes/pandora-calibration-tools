@@ -143,15 +143,115 @@ theta_energy_calibration_params = {...}
 DDMarlinPandora.Parameters.update(theta_energy_calibration_params)
 ```
 
-## Integration Into SteeringMacros
+## Rebuild And Run After Updates
 
-In your fork of `SteeringMacros/k4Reco/steer_reco.py`:
+Use this when you have updated any of the three runtime repos:
 
-1. Paste `theta_energy_calibration_params` near `DDMarlinPandora.Parameters`.
-2. Add:
-   - `DDMarlinPandora.Parameters.update(theta_energy_calibration_params)`
+- `trholmes/LCContent`
+- `trholmes/DDMarlinPandora`
+- `trholmes/SteeringMacros`
 
-Note: these parameters become active only once corresponding support is added in your `DDMarlinPandora` + `LCContent` builds.
+The commands below assume this container layout:
+
+- `/scratch/trholmes/mucol/v2.9.7/LCContent`
+- `/scratch/trholmes/mucol/v2.9.7/DDMarlinPandora`
+- `/scratch/trholmes/mucol/v2.9.7/SteeringMacros`
+- `/scratch/trholmes/mucol/v2.9.7/pandora-calibration-tools`
+
+### 1) Pull the current branches
+
+```bash
+cd /scratch/trholmes/mucol/v2.9.7/LCContent
+git fetch trholmes codex/theta-energy-binned-plugin
+git checkout codex/theta-energy-binned-plugin
+git pull --ff-only trholmes codex/theta-energy-binned-plugin
+
+cd /scratch/trholmes/mucol/v2.9.7/DDMarlinPandora
+git fetch trholmes codex/theta-energy-params-plumbing
+git checkout codex/theta-energy-params-plumbing
+git pull --ff-only trholmes codex/theta-energy-params-plumbing
+
+cd /scratch/trholmes/mucol/v2.9.7/SteeringMacros
+git fetch trholmes codex/ecal-3d-precalib
+git checkout codex/ecal-3d-precalib
+git pull --ff-only trholmes codex/ecal-3d-precalib
+```
+
+### 2) Rebuild and install `LCContent`
+
+```bash
+cd /scratch/trholmes/mucol/v2.9.7/LCContent
+mkdir -p build install
+cd build
+
+cmake .. \
+  -DCMAKE_INSTALL_PREFIX=/scratch/trholmes/mucol/v2.9.7/LCContent/install
+cmake --build . -j$(nproc)
+cmake --install .
+```
+
+If you already have a build directory and CMake cache from an older branch, it is safer to remove `build/` and configure again before rebuilding.
+
+### 3) Rebuild and install `DDMarlinPandora` against the local `LCContent`
+
+```bash
+cd /scratch/trholmes/mucol/v2.9.7/DDMarlinPandora
+mkdir -p build install
+cd build
+
+cmake .. \
+  -DCMAKE_INSTALL_PREFIX=/scratch/trholmes/mucol/v2.9.7/DDMarlinPandora/install \
+  -DLCContent_DIR=/scratch/trholmes/mucol/v2.9.7/LCContent/install/lib/cmake/LCContent
+cmake --build . -j$(nproc)
+cmake --install .
+```
+
+If your environment installs to `lib64` instead of `lib`, adjust the `LCContent_DIR`, `LD_LIBRARY_PATH`, and `MARLIN_DLL` paths below accordingly.
+
+### 4) Point runtime to the local libraries
+
+```bash
+export LD_LIBRARY_PATH=/scratch/trholmes/mucol/v2.9.7/LCContent/install/lib:/scratch/trholmes/mucol/v2.9.7/DDMarlinPandora/install/lib:$LD_LIBRARY_PATH
+export MARLIN_DLL=/scratch/trholmes/mucol/v2.9.7/DDMarlinPandora/install/lib/libDDMarlinPandora.so:$MARLIN_DLL
+```
+
+Sanity checks:
+
+```bash
+echo "$LD_LIBRARY_PATH" | tr ':' '\n' | head -n 5
+echo "$MARLIN_DLL" | tr ':' '\n' | head -n 10
+```
+
+In the `k4run` log, `MyAIDAProcessor` should show your local:
+
+- `/scratch/trholmes/mucol/v2.9.7/DDMarlinPandora/install/lib/libDDMarlinPandora.so`
+
+### 5) Run reconstruction with the payload
+
+```bash
+k4run /scratch/trholmes/mucol/v2.9.7/SteeringMacros/k4Reco/steer_reco.py \
+  --code /scratch/trholmes/mucol/v2.9.7 \
+  --data /scratch/trholmes/mucol/v2.9.7 \
+  --TypeEvent photonGun_E_0_50 \
+  --InFileName 0 \
+  --thetaEnergyCalibPayload /scratch/trholmes/mucol/v2.9.7/pandora-calibration-tools/calib/theta_energy_ddmarlin_params.json \
+  --writeClusterCalibrationComparison
+```
+
+This writes both:
+
+- `PandoraClusters` for the uncalibrated comparison collection
+- `PandoraClustersCalibrated` for the corrected comparison collection
+
+### 6) What to look for in the log
+
+You should see all of the following:
+
+1. `Loaded theta-energy calibration payload ...`
+2. `Updated HadronicEnergyCorrectionPlugins in Pandora XML to include: ThetaEnergyBinned`
+3. `DDPandoraPFANewProcessor: loaded theta-energy correction tables for plugin 'ThetaEnergyBinned' ...`
+
+If those messages are missing, the local runtime override is usually not active.
 
 ## Recommended Companion Repos
 
