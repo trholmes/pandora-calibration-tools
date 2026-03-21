@@ -174,6 +174,32 @@ def combine_ddmarlin_params(ecal_table: CalibrationTable, hcal_table: Calibratio
     return params
 
 
+def combine_branch_ddmarlin_params(
+    ecal_table: CalibrationTable,
+    hcal_table: CalibrationTable,
+    branch: str,
+    plugin_name: str = "ThetaEnergyBinned",
+) -> dict:
+    branch_key = branch.strip().lower()
+    if branch_key == "hadronic":
+        prefix = "Hadronic"
+    elif branch_key == "electromagnetic":
+        prefix = "Electromagnetic"
+    else:
+        raise ValueError(f"Unsupported branch: {branch}")
+
+    return {
+        f"{prefix}ThetaEnergyCorrectionEnabled": ["true"],
+        f"{prefix}ThetaEnergyCorrectionPluginName": [plugin_name],
+        f"{prefix}ECalThetaEnergyCorrectionThetaBinEdges": [_fmt_float(x) for x in ecal_table.theta_edges],
+        f"{prefix}ECalThetaEnergyCorrectionEnergyBinEdges": [_fmt_float(x) for x in ecal_table.energy_edges],
+        f"{prefix}ECalThetaEnergyCorrectionScaleFactors": [_fmt_float(x) for x in ecal_table.scales],
+        f"{prefix}HCalThetaEnergyCorrectionThetaBinEdges": [_fmt_float(x) for x in hcal_table.theta_edges],
+        f"{prefix}HCalThetaEnergyCorrectionEnergyBinEdges": [_fmt_float(x) for x in hcal_table.energy_edges],
+        f"{prefix}HCalThetaEnergyCorrectionScaleFactors": [_fmt_float(x) for x in hcal_table.scales],
+    }
+
+
 def setup_lcio_reader(collection_names: Sequence[str]):
     try:
         import pyLCIO  # type: ignore

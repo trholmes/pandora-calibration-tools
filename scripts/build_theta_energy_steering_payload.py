@@ -6,7 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 
-from calibration_lib import combine_ddmarlin_params, load_table_json
+from calibration_lib import combine_branch_ddmarlin_params, combine_ddmarlin_params, load_table_json
 
 
 def render_python_update_block(params: dict) -> str:
@@ -25,6 +25,12 @@ def main() -> int:
     parser.add_argument("--ecal-calibration", required=True, help="ECAL calibration JSON.")
     parser.add_argument("--hcal-calibration", required=True, help="HCAL calibration JSON.")
     parser.add_argument("--plugin-name", default="ThetaEnergyBinned")
+    parser.add_argument(
+        "--branch",
+        choices=["legacy", "hadronic", "electromagnetic"],
+        default="legacy",
+        help="Payload namespace to generate. 'legacy' preserves the historical hadronic-only key set.",
+    )
     parser.add_argument("--output-json", help="Write merged DDMarlin parameter payload JSON.")
     parser.add_argument("--output-python", help="Write ready-to-paste python block for steer_reco.py.")
     args = parser.parse_args()
@@ -36,7 +42,10 @@ def main() -> int:
     if hcal.domain.upper() != "HCAL":
         raise RuntimeError(f"Expected HCAL domain table, got {hcal.domain}")
 
-    params = combine_ddmarlin_params(ecal, hcal, plugin_name=args.plugin_name)
+    if args.branch == "legacy":
+        params = combine_ddmarlin_params(ecal, hcal, plugin_name=args.plugin_name)
+    else:
+        params = combine_branch_ddmarlin_params(ecal, hcal, branch=args.branch, plugin_name=args.plugin_name)
 
     if args.output_json:
         with open(args.output_json, "w", encoding="utf-8") as f:
