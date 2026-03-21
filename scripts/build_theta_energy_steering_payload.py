@@ -6,7 +6,12 @@ from __future__ import annotations
 import argparse
 import json
 
-from calibration_lib import combine_branch_ddmarlin_params, combine_ddmarlin_params, load_table_json
+from calibration_lib import (
+    build_photon_em_ddmarlin_params,
+    combine_branch_ddmarlin_params,
+    combine_ddmarlin_params,
+    load_table_json,
+)
 
 
 def render_python_update_block(params: dict) -> str:
@@ -22,9 +27,10 @@ def render_python_update_block(params: dict) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--ecal-calibration", required=True, help="ECAL calibration JSON.")
-    parser.add_argument("--hcal-calibration", required=True, help="HCAL calibration JSON.")
-    parser.add_argument("--plugin-name", default="ThetaEnergyBinned")
+    parser.add_argument("--ecal-calibration", help="ECAL calibration JSON.")
+    parser.add_argument("--hcal-calibration", help="HCAL calibration JSON.")
+    parser.add_argument("--photon-em-calibration", help="Photon EM calibration JSON.")
+    parser.add_argument("--plugin-name", default=None)
     parser.add_argument(
         "--branch",
         choices=["legacy", "hadronic", "electromagnetic"],
@@ -35,17 +41,27 @@ def main() -> int:
     parser.add_argument("--output-python", help="Write ready-to-paste python block for steer_reco.py.")
     args = parser.parse_args()
 
-    ecal = load_table_json(args.ecal_calibration)
-    hcal = load_table_json(args.hcal_calibration)
-    if ecal.domain.upper() != "ECAL":
-        raise RuntimeError(f"Expected ECAL domain table, got {ecal.domain}")
-    if hcal.domain.upper() != "HCAL":
-        raise RuntimeError(f"Expected HCAL domain table, got {hcal.domain}")
-
-    if args.branch == "legacy":
-        params = combine_ddmarlin_params(ecal, hcal, plugin_name=args.plugin_name)
+    if args.photon_em_calibration:
+        if args.ecal_calibration or args.hcal_calibration:
+            raise RuntimeError("Use either --photon-em-calibration or the ECAL+HCAL arguments, not both.")
+        plugin_name = args.plugin_name or "PhotonEMNonLinearity"
+        params = build_photon_em_ddmarlin_params(load_table_json(args.photon_em_calibration), plugin_name=plugin_name)
     else:
-        params = combine_branch_ddmarlin_params(ecal, hcal, branch=args.branch, plugin_name=args.plugin_name)
+        if not args.ecal_calibration or not args.hcal_calibration:
+            raise RuntimeError("ECAL+HCAL mode requires both --ecal-calibration and --hcal-calibration.")
+
+        ecal = load_table_json(args.ecal_calibration)
+        hcal = load_table_json(args.hcal_calibration)
+        plugin_name = args.plugin_name or "ThetaEnergyBinned"
+        if ecal.domain.upper() != "ECAL":
+            raise RuntimeError(f"Expected ECAL domain table, got {ecal.domain}")
+        if hcal.domain.upper() != "HCAL":
+            raise RuntimeError(f"Expected HCAL domain table, got {hcal.domain}")
+
+        if args.branch == "legacy":
+            params = combine_ddmarlin_params(ecal, hcal, plugin_name=plugin_name)
+        else:
+            params = combine_branch_ddmarlin_params(ecal, hcal, branch=args.branch, plugin_name=plugin_name)
 
     if args.output_json:
         with open(args.output_json, "w", encoding="utf-8") as f:

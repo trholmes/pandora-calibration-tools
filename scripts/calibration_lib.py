@@ -174,6 +174,22 @@ def combine_ddmarlin_params(ecal_table: CalibrationTable, hcal_table: Calibratio
     return params
 
 
+def build_photon_em_ddmarlin_params(
+    em_table: CalibrationTable,
+    plugin_name: str = "PhotonEMNonLinearity",
+) -> dict:
+    if em_table.domain.upper() != "ECAL":
+        raise ValueError(f"Photon EM payload expects ECAL-domain table, got {em_table.domain}")
+
+    return {
+        "ElectromagneticThetaEnergyCorrectionEnabled": ["true"],
+        "ElectromagneticThetaEnergyCorrectionPluginName": [plugin_name],
+        "ElectromagneticThetaEnergyCorrectionThetaBinEdges": [_fmt_float(x) for x in em_table.theta_edges],
+        "ElectromagneticThetaEnergyCorrectionEnergyBinEdges": [_fmt_float(x) for x in em_table.energy_edges],
+        "ElectromagneticThetaEnergyCorrectionScaleFactors": [_fmt_float(x) for x in em_table.scales],
+    }
+
+
 def combine_branch_ddmarlin_params(
     ecal_table: CalibrationTable,
     hcal_table: CalibrationTable,

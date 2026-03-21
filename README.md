@@ -143,6 +143,27 @@ theta_energy_calibration_params = {...}
 DDMarlinPandora.Parameters.update(theta_energy_calibration_params)
 ```
 
+### Photon EM payload
+
+For the photon-focused EM correction path, build a single-table payload from the ECAL/photon calibration:
+
+```bash
+python3 scripts/build_theta_energy_steering_payload.py \
+  --photon-em-calibration calib/ecal_theta_energy_calib.json \
+  --output-json calib/photon_em_calib_payload.json
+```
+
+Then pass it to reconstruction:
+
+```bash
+k4run /scratch/trholmes/mucol/v2.9.7/SteeringMacros/k4Reco/steer_reco.py \
+  --code /scratch/trholmes/mucol/v2.9.7 \
+  --data /scratch/trholmes/mucol/v2.9.7 \
+  --TypeEvent photonGun_E_0_50 \
+  --InFileName 0 \
+  --photonEMCalibPayload /scratch/trholmes/mucol/v2.9.7/pandora-calibration-tools/calib/photon_em_calib_payload.json
+```
+
 ## Rebuild And Run After Updates
 
 Use this when you have updated any of the three runtime repos:
