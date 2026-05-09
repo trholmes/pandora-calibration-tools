@@ -8,6 +8,89 @@ Default calibration source in scripts is **cluster-based** (`PandoraClusters`) u
 - ECAL subdetector index: `0`
 - HCAL subdetector index: `1`
 
+## Fresh MAIA Checkout For Calibration Development
+
+Use this for a clean checkout in a new MAIA software area, e.g. `/scratch/trholmes/mucol/v2.11`.
+
+```bash
+export MUCOL_BASE=/scratch/trholmes/mucol/v2.11
+mkdir -p "${MUCOL_BASE}"
+cd "${MUCOL_BASE}"
+```
+
+Clone the runtime repositories and this calibration-tool repository:
+
+```bash
+git clone git@github.com:PandoraPFA/LCContent.git
+git clone git@github.com:MuonColliderSoft/DDMarlinPandora.git
+git clone https://github.com/madbaron/SteeringMacros.git
+git clone git@github.com:trholmes/pandora-calibration-tools.git
+```
+
+Add the fork remotes used by the calibration branches:
+
+```bash
+cd "${MUCOL_BASE}/LCContent"
+git remote add trholmes git@github.com:trholmes/LCContent.git
+
+cd "${MUCOL_BASE}/DDMarlinPandora"
+git remote add trholmes git@github.com:trholmes/DDMarlinPandora.git
+
+cd "${MUCOL_BASE}/SteeringMacros"
+git remote add trholmes git@github.com:trholmes/SteeringMacros.git
+```
+
+Check out the photon EM calibration branches:
+
+```bash
+cd "${MUCOL_BASE}/LCContent"
+git fetch trholmes codex/photon-em-nonlinearity
+git checkout codex/photon-em-nonlinearity
+
+cd "${MUCOL_BASE}/DDMarlinPandora"
+git fetch trholmes codex/photon-em-theta-energy
+git checkout codex/photon-em-theta-energy
+
+cd "${MUCOL_BASE}/SteeringMacros"
+git fetch trholmes codex/photon-em-steering
+git checkout codex/photon-em-steering
+
+cd "${MUCOL_BASE}/pandora-calibration-tools"
+git fetch origin codex/photon-em-payload
+git checkout codex/photon-em-payload
+```
+
+Build and install local `LCContent` and `DDMarlinPandora`:
+
+```bash
+cd "${MUCOL_BASE}/LCContent"
+rm -rf build install
+mkdir -p build install
+cd build
+cmake .. -DCMAKE_INSTALL_PREFIX="${MUCOL_BASE}/LCContent/install"
+cmake --build . -j"$(nproc)"
+cmake --install .
+
+cd "${MUCOL_BASE}/DDMarlinPandora"
+rm -rf build install
+mkdir -p build install
+cd build
+cmake .. \
+  -DCMAKE_INSTALL_PREFIX="${MUCOL_BASE}/DDMarlinPandora/install" \
+  -DLCContent_DIR="${MUCOL_BASE}/LCContent/install/lib/cmake/LCContent"
+cmake --build . -j"$(nproc)"
+cmake --install .
+```
+
+Point runtime at those local builds before running `k4run`:
+
+```bash
+export LD_LIBRARY_PATH="${MUCOL_BASE}/LCContent/install/lib:${MUCOL_BASE}/DDMarlinPandora/install/lib:${LD_LIBRARY_PATH}"
+export MARLIN_DLL="${MUCOL_BASE}/DDMarlinPandora/install/lib/libDDMarlinPandora.so:${MARLIN_DLL}"
+```
+
+If your CMake install uses `lib64`, replace `lib` with `lib64` in `LCContent_DIR`, `LD_LIBRARY_PATH`, and `MARLIN_DLL`.
+
 ## Included Spec
 
 Full design/specification is included here:
