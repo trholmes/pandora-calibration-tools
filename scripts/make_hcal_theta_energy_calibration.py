@@ -41,7 +41,25 @@ def main() -> int:
     parser.add_argument("--ecal-endcap-collection", default="ECalEndcapCollection")
     parser.add_argument("--hcal-barrel-collection", default="HCalBarrelCollection")
     parser.add_argument("--hcal-endcap-collection", default="HCalEndcapCollection")
-    parser.add_argument("--ecal-calibration", required=True, help="ECAL calibration JSON from pass A.")
+    parser.add_argument("--ecal-calibration", help="ECAL calibration JSON from pass A. Required for --energy-basis raw.")
+    parser.add_argument(
+        "--energy-basis",
+        choices=["raw", "hadronic"],
+        default="raw",
+        help="Use 'hadronic' to train on the branch-summed Pandora hadronic energy basis.",
+    )
+    parser.add_argument(
+        "--ecal-to-had-gev",
+        type=float,
+        default=1.0,
+        help="Raw ECAL energy to Pandora HAD-branch scale factor used when --energy-basis hadronic.",
+    )
+    parser.add_argument(
+        "--hcal-to-had-gev",
+        type=float,
+        default=1.0,
+        help="Raw HCAL energy to Pandora HAD-branch scale factor used when --energy-basis hadronic.",
+    )
     parser.add_argument(
         "--ecal-lookup-energy",
         choices=["measured"],
@@ -70,7 +88,9 @@ def main() -> int:
     if not files:
         raise RuntimeError("No input files found.")
 
-    ecal_table = load_table_json(args.ecal_calibration)
+    if args.energy_basis == "raw" and not args.ecal_calibration:
+        raise RuntimeError("--ecal-calibration is required when --energy-basis raw.")
+    ecal_table = load_table_json(args.ecal_calibration) if args.ecal_calibration else None
     n_theta = len(theta_edges) - 1
     n_energy = len(energy_edges) - 1
     ratios_per_bin = [[] for _ in range(n_theta * n_energy)]
@@ -138,17 +158,24 @@ def main() -> int:
             if hcal_measured <= 0.0:
                 continue
 
-            ecal_corrected = apply_ecal_calibration(ecal_table, theta, ecal_measured)
-            target_hcal = truth_e - ecal_corrected
-            if target_hcal <= 0.0:
-                if args.negative_target_policy == "skip":
+            if args.energy_basis == "hadronic":
+                measured_energy = ecal_measured * args.ecal_to_had_gev + hcal_measured * args.hcal_to_had_gev
+                if measured_energy <= 0.0:
                     continue
-                target_hcal = 0.0
-            if target_hcal <= 0.0:
-                continue
+                ratio = truth_e / measured_energy
+                energy_axis_value = measured_energy
+            else:
+                ecal_corrected = apply_ecal_calibration(ecal_table, theta, ecal_measured)
+                target_hcal = truth_e - ecal_corrected
+                if target_hcal <= 0.0:
+                    if args.negative_target_policy == "skip":
+                        continue
+                    target_hcal = 0.0
+                if target_hcal <= 0.0:
+                    continue
 
-            ratio = target_hcal / hcal_measured
-            energy_axis_value = hcal_measured
+                ratio = target_hcal / hcal_measured
+                energy_axis_value = hcal_measured
 
             i_theta = find_bin(theta_edges, theta)
             i_energy = find_bin(energy_edges, energy_axis_value)
@@ -161,7 +188,7 @@ def main() -> int:
             break
 
     table = build_table_from_ratios(
-        domain="HCAL",
+        domain="HADRONIC" if args.energy_basis == "hadronic" else "HCAL",
         theta_edges=theta_edges,
         energy_edges=energy_edges,
         ratios_per_bin=ratios_per_bin,
@@ -188,6 +215,9 @@ def main() -> int:
             "ecal_calibration": args.ecal_calibration,
             "ecal_lookup_energy": "measured",
             "hcal_energy_axis": "measured",
+            "energy_basis": args.energy_basis,
+            "ecal_to_had_gev": args.ecal_to_had_gev,
+            "hcal_to_had_gev": args.hcal_to_had_gev,
             "negative_target_policy": args.negative_target_policy,
             "runtime_sec": round(time.time() - t0, 3),
         },

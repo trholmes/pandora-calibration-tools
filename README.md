@@ -171,6 +171,8 @@ python3 scripts/make_ecal_theta_energy_calibration.py \
 
 ### 2) Pass B: build HCAL table (ECAL fixed)
 
+For the first-pass hadronic branch test, train one branch-summed hadronic table. The raw ECAL and HCAL subdetector energies are converted to the Pandora HAD energy basis before ratios and energy-axis binning are computed.
+
 ```bash
 python3 scripts/make_hcal_theta_energy_calibration.py \
   --inputs /scratch/trholmes/mucol/data/reco/neutronGun_E_250_1000 \
@@ -179,14 +181,32 @@ python3 scripts/make_hcal_theta_energy_calibration.py \
   --cluster-collection PandoraClusters \
   --skip-missing-subdet-split \
   --hcal-fraction-min 0.1 \
+  --energy-basis hadronic \
+  --ecal-to-had-gev 1.24223718397 \
+  --hcal-to-had-gev 1.01799349172 \
   --theta-bins 0,0.35,0.7,1.05,1.4,1.75,2.1,2.45,2.8,3.14159 \
   --energy-bins 0,5,10,20,50,100,200,500,1000,5000 \
   --pdg-ids 2112,211,111 \
-  --ecal-calibration calib/ecal_theta_energy_calib.json \
-  --output calib/hcal_theta_energy_calib.json
+  --output calib/hadronic_theta_energy_calib.json
 ```
 
 ### 3) Pass C: closure summary
+
+For the first-pass hadronic branch table, validate the single hadronic table directly:
+
+```bash
+python3 scripts/validate_theta_energy_calibration.py \
+  --hcal-inputs /scratch/trholmes/mucol/data/reco/neutronGun_E_0_50 \
+  --recursive \
+  --energy-source clusters \
+  --cluster-collection PandoraClusters \
+  --skip-missing-subdet-split \
+  --hadronic-calibration calib/hadronic_theta_energy_calib.json \
+  --plot-dir calib/plots \
+  --output calib/hadronic_closure_summary.json
+```
+
+The older ECAL+HCAL component-closure mode is still available:
 
 ```bash
 python3 scripts/validate_theta_energy_calibration.py \
@@ -228,6 +248,25 @@ This produces:
 ```python
 theta_energy_calibration_params = {...}
 DDMarlinPandora.Parameters.update(theta_energy_calibration_params)
+```
+
+For the first-pass hadronic branch runtime test, build a single-table hadronic payload:
+
+```bash
+python3 scripts/build_theta_energy_steering_payload.py \
+  --hadronic-calibration calib/hadronic_theta_energy_calib.json \
+  --output-json calib/hadronic_calib_payload.json
+```
+
+Pass it to reconstruction with:
+
+```bash
+k4run /scratch/trholmes/mucol/v2.11/SteeringMacros/k4Reco/steer_reco.py \
+  --code /scratch/trholmes/mucol/v2.11 \
+  --data /scratch/trholmes/mucol/v2.11 \
+  --TypeEvent neutronGun_E_0_50 \
+  --InFileName 0 \
+  --hadronicCalibPayload /scratch/trholmes/mucol/v2.11/pandora-calibration-tools/calib/hadronic_calib_payload.json
 ```
 
 ### Photon EM payload

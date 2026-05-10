@@ -12,6 +12,7 @@ import time
 
 from calibration_lib import (
     apply_ecal_calibration,
+    apply_hadronic_calibration,
     expand_input_paths,
     find_single_primary,
     get_best_cluster,
@@ -169,8 +170,9 @@ def main() -> int:
     parser.add_argument("--hcal-endcap-collection", default="HCalEndcapCollection")
     parser.add_argument("--ecal-pdg-ids", default="22")
     parser.add_argument("--hcal-pdg-ids", default="2112,211,111")
-    parser.add_argument("--ecal-calibration", required=True)
-    parser.add_argument("--hcal-calibration", required=True)
+    parser.add_argument("--ecal-calibration")
+    parser.add_argument("--hcal-calibration")
+    parser.add_argument("--hadronic-calibration")
     parser.add_argument("--output", required=True, help="Output JSON summary")
     parser.add_argument(
         "--plot-dir",
@@ -186,13 +188,19 @@ def main() -> int:
 
     ecal_files = expand_input_paths(ecal_inputs, args.file_glob, recursive=args.recursive)
     hcal_files = expand_input_paths(hcal_inputs, args.file_glob, recursive=args.recursive)
-    if not ecal_files:
+    if not ecal_files and args.ecal_calibration:
         raise RuntimeError("No ECAL input files found.")
     if not hcal_files:
         raise RuntimeError("No HCAL input files found.")
 
-    ecal_table = load_table_json(args.ecal_calibration)
-    hcal_table = load_table_json(args.hcal_calibration)
+    if args.hadronic_calibration and (args.ecal_calibration or args.hcal_calibration):
+        raise RuntimeError("Use either --hadronic-calibration or the ECAL+HCAL calibration pair, not both.")
+    if not args.hadronic_calibration and (not args.ecal_calibration or not args.hcal_calibration):
+        raise RuntimeError("Provide --hadronic-calibration or both --ecal-calibration and --hcal-calibration.")
+
+    ecal_table = load_table_json(args.ecal_calibration) if args.ecal_calibration else None
+    hcal_table = load_table_json(args.hcal_calibration) if args.hcal_calibration else None
+    hadronic_table = load_table_json(args.hadronic_calibration) if args.hadronic_calibration else None
     ecal_pdgs = parse_int_list(args.ecal_pdg_ids)
     hcal_pdgs = parse_int_list(args.hcal_pdg_ids)
 
@@ -212,9 +220,11 @@ def main() -> int:
     ecal_closure = []
     hcal_closure = []
     total_closure = []
+    hadronic_closure = []
     t0 = time.time()
 
-    for fname in ecal_files:
+    ecal_validation_files = ecal_files if ecal_table else []
+    for fname in ecal_validation_files:
         reader.open(fname)
         for event in reader:
             if args.max_events > 0 and events_total_ecal >= args.max_events:
@@ -289,15 +299,20 @@ def main() -> int:
             if mcp_hcal is not None and hcal_measured > 0.0:
                 truth_e = mcp_hcal.getEnergy()
                 theta = mcp_theta(mcp_hcal)
-                ecal_corr = apply_ecal_calibration(ecal_table, theta, ecal_measured)
-                target_hcal = truth_e - ecal_corr
-                if target_hcal > 0.0:
-                    hcal_corr = hcal_table.lookup(theta, hcal_measured) * hcal_measured
-                    if hcal_corr > 0.0:
-                        hcal_closure.append(target_hcal / hcal_corr)
-                total_corr = ecal_corr + hcal_table.lookup(theta, hcal_measured) * hcal_measured
-                if total_corr > 0.0:
-                    total_closure.append(truth_e / total_corr)
+                if hadronic_table:
+                    hadronic_corr = apply_hadronic_calibration(hadronic_table, theta, ecal_measured, hcal_measured)
+                    if hadronic_corr > 0.0:
+                        hadronic_closure.append(truth_e / hadronic_corr)
+                else:
+                    ecal_corr = apply_ecal_calibration(ecal_table, theta, ecal_measured)
+                    target_hcal = truth_e - ecal_corr
+                    if target_hcal > 0.0:
+                        hcal_corr = hcal_table.lookup(theta, hcal_measured) * hcal_measured
+                        if hcal_corr > 0.0:
+                            hcal_closure.append(target_hcal / hcal_corr)
+                    total_corr = ecal_corr + hcal_table.lookup(theta, hcal_measured) * hcal_measured
+                    if total_corr > 0.0:
+                        total_closure.append(truth_e / total_corr)
         reader.close()
         if args.max_events > 0 and events_total_hcal >= args.max_events:
             break
@@ -312,11 +327,13 @@ def main() -> int:
         "ecal_closure_truth_over_corrected": summarize(ecal_closure),
         "hcal_closure_target_over_corrected": summarize(hcal_closure),
         "total_closure_truth_over_corrected": summarize(total_closure),
+        "hadronic_closure_truth_over_corrected": summarize(hadronic_closure),
         "inputs": {
             "ecal_inputs": ecal_inputs,
             "hcal_inputs": hcal_inputs,
             "ecal_calibration": args.ecal_calibration,
             "hcal_calibration": args.hcal_calibration,
+            "hadronic_calibration": args.hadronic_calibration,
             "ecal_pdg_ids": ecal_pdgs,
             "hcal_pdg_ids": hcal_pdgs,
             "energy_source": args.energy_source,
@@ -327,10 +344,14 @@ def main() -> int:
         },
     }
 
-    if args.plot_dir:
+    if args.plot_dir and ecal_table and hcal_table:
         summary["plot_outputs"] = {
             "ecal": _plot_table(ecal_table, args.plot_dir),
             "hcal": _plot_table(hcal_table, args.plot_dir),
+        }
+    elif args.plot_dir and hadronic_table:
+        summary["plot_outputs"] = {
+            "hadronic": _plot_table(hadronic_table, args.plot_dir),
         }
 
     with open(args.output, "w", encoding="utf-8") as f:
@@ -338,6 +359,7 @@ def main() -> int:
     print(f"Wrote validation summary: {args.output}")
     print(json.dumps(summary["ecal_closure_truth_over_corrected"], indent=2))
     print(json.dumps(summary["hcal_closure_target_over_corrected"], indent=2))
+    print(json.dumps(summary["hadronic_closure_truth_over_corrected"], indent=2))
     return 0
 
 

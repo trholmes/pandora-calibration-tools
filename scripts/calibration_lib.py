@@ -164,6 +164,20 @@ def apply_ecal_calibration(table: CalibrationTable, theta: float, raw_ecal_energ
     return table.lookup(theta, table_energy) * table_energy
 
 
+def get_hadronic_table_energy(table: CalibrationTable, raw_ecal_energy: float, raw_hcal_energy: float) -> float:
+    basis = str(table.metadata.get("energy_basis", "raw")).lower()
+    if basis != "hadronic":
+        raise ValueError(f"Unsupported hadronic calibration energy_basis: {basis}")
+    ecal_to_had = float(table.metadata.get("ecal_to_had_gev", 1.0))
+    hcal_to_had = float(table.metadata.get("hcal_to_had_gev", 1.0))
+    return raw_ecal_energy * ecal_to_had + raw_hcal_energy * hcal_to_had
+
+
+def apply_hadronic_calibration(table: CalibrationTable, theta: float, raw_ecal_energy: float, raw_hcal_energy: float) -> float:
+    table_energy = get_hadronic_table_energy(table, raw_ecal_energy, raw_hcal_energy)
+    return table.lookup(theta, table_energy) * table_energy
+
+
 def _fmt_float(x: float) -> str:
     return f"{x:.8g}"
 
@@ -203,6 +217,24 @@ def build_photon_em_ddmarlin_params(
         "ElectromagneticThetaEnergyCorrectionThetaBinEdges": [_fmt_float(x) for x in em_table.theta_edges],
         "ElectromagneticThetaEnergyCorrectionEnergyBinEdges": [_fmt_float(x) for x in em_table.energy_edges],
         "ElectromagneticThetaEnergyCorrectionScaleFactors": [_fmt_float(x) for x in em_table.scales],
+    }
+
+
+def build_hadronic_ddmarlin_params(
+    hadronic_table: CalibrationTable,
+    plugin_name: str = "HadronicThetaEnergyBinned",
+) -> dict:
+    if hadronic_table.domain.upper() != "HADRONIC":
+        raise ValueError(f"Hadronic payload expects HADRONIC-domain table, got {hadronic_table.domain}")
+    if str(hadronic_table.metadata.get("energy_basis", "raw")).lower() != "hadronic":
+        raise ValueError("Hadronic payload expects a table built with --energy-basis hadronic")
+
+    return {
+        "HadronicThetaEnergyCorrectionEnabled": ["true"],
+        "HadronicThetaEnergyCorrectionPluginName": [plugin_name],
+        "HadronicThetaEnergyCorrectionThetaBinEdges": [_fmt_float(x) for x in hadronic_table.theta_edges],
+        "HadronicThetaEnergyCorrectionEnergyBinEdges": [_fmt_float(x) for x in hadronic_table.energy_edges],
+        "HadronicThetaEnergyCorrectionScaleFactors": [_fmt_float(x) for x in hadronic_table.scales],
     }
 
 

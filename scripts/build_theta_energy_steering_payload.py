@@ -7,6 +7,7 @@ import argparse
 import json
 
 from calibration_lib import (
+    build_hadronic_ddmarlin_params,
     build_photon_em_ddmarlin_params,
     combine_branch_ddmarlin_params,
     combine_ddmarlin_params,
@@ -30,6 +31,7 @@ def main() -> int:
     parser.add_argument("--ecal-calibration", help="ECAL calibration JSON.")
     parser.add_argument("--hcal-calibration", help="HCAL calibration JSON.")
     parser.add_argument("--photon-em-calibration", help="Photon EM calibration JSON.")
+    parser.add_argument("--hadronic-calibration", help="Hadronic branch calibration JSON.")
     parser.add_argument("--plugin-name", default=None)
     parser.add_argument(
         "--branch",
@@ -42,10 +44,15 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.photon_em_calibration:
-        if args.ecal_calibration or args.hcal_calibration:
-            raise RuntimeError("Use either --photon-em-calibration or the ECAL+HCAL arguments, not both.")
+        if args.ecal_calibration or args.hcal_calibration or args.hadronic_calibration:
+            raise RuntimeError("Use only one payload mode at a time.")
         plugin_name = args.plugin_name or "PhotonEMNonLinearity"
         params = build_photon_em_ddmarlin_params(load_table_json(args.photon_em_calibration), plugin_name=plugin_name)
+    elif args.hadronic_calibration:
+        if args.ecal_calibration or args.hcal_calibration:
+            raise RuntimeError("Use only one payload mode at a time.")
+        plugin_name = args.plugin_name or "HadronicThetaEnergyBinned"
+        params = build_hadronic_ddmarlin_params(load_table_json(args.hadronic_calibration), plugin_name=plugin_name)
     else:
         if not args.ecal_calibration or not args.hcal_calibration:
             raise RuntimeError("ECAL+HCAL mode requires both --ecal-calibration and --hcal-calibration.")
