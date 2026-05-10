@@ -151,6 +151,8 @@ mkdir -p calib
 
 ### 1) Pass A: build ECAL table
 
+For photon EM corrections, build the ECAL table in the Pandora EM energy basis. The raw ECAL subdetector energy from `cluster.getSubdetectorEnergies()` is multiplied by the same `ECalToEMGeVCalibration` factor used by `DDMarlinPandora` before ratios and energy-axis binning are computed.
+
 ```bash
 python3 scripts/make_ecal_theta_energy_calibration.py \
   --inputs /scratch/trholmes/mucol/data/reco/photonGun_E_0_50 \
@@ -159,6 +161,8 @@ python3 scripts/make_ecal_theta_energy_calibration.py \
   --cluster-collection PandoraClusters \
   --skip-missing-subdet-split \
   --ecal-fraction-min 0.7 \
+  --energy-basis em \
+  --ecal-to-em-gev 1.02373335516 \
   --theta-bins 0,0.35,0.7,1.05,1.4,1.75,2.1,2.45,2.8,3.14159 \
   --energy-bins 0,5,10,20,50,100,200,500,1000,5000 \
   --pdg-ids 22 \

@@ -150,6 +150,20 @@ def load_table_json(path: str) -> CalibrationTable:
     return CalibrationTable.from_json_dict(data)
 
 
+def get_ecal_table_energy(table: CalibrationTable, raw_ecal_energy: float) -> float:
+    basis = str(table.metadata.get("energy_basis", "raw")).lower()
+    if basis == "raw":
+        return raw_ecal_energy
+    if basis == "em":
+        return raw_ecal_energy * float(table.metadata.get("ecal_to_em_gev", 1.0))
+    raise ValueError(f"Unsupported ECAL calibration energy_basis: {basis}")
+
+
+def apply_ecal_calibration(table: CalibrationTable, theta: float, raw_ecal_energy: float) -> float:
+    table_energy = get_ecal_table_energy(table, raw_ecal_energy)
+    return table.lookup(theta, table_energy) * table_energy
+
+
 def _fmt_float(x: float) -> str:
     return f"{x:.8g}"
 
@@ -180,6 +194,8 @@ def build_photon_em_ddmarlin_params(
 ) -> dict:
     if em_table.domain.upper() != "ECAL":
         raise ValueError(f"Photon EM payload expects ECAL-domain table, got {em_table.domain}")
+    if str(em_table.metadata.get("energy_basis", "raw")).lower() != "em":
+        raise ValueError("Photon EM payload expects an ECAL table built with --energy-basis em")
 
     return {
         "ElectromagneticThetaEnergyCorrectionEnabled": ["true"],

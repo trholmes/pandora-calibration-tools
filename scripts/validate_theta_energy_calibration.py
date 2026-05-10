@@ -11,6 +11,7 @@ import statistics
 import time
 
 from calibration_lib import (
+    apply_ecal_calibration,
     expand_input_paths,
     find_single_primary,
     get_best_cluster,
@@ -245,7 +246,7 @@ def main() -> int:
             if mcp_ecal is not None and ecal_measured > 0.0:
                 truth_e = mcp_ecal.getEnergy()
                 theta = mcp_theta(mcp_ecal)
-                ecal_corr = ecal_table.lookup(theta, ecal_measured) * ecal_measured
+                ecal_corr = apply_ecal_calibration(ecal_table, theta, ecal_measured)
                 if ecal_corr > 0.0:
                     ecal_closure.append(truth_e / ecal_corr)
         reader.close()
@@ -288,7 +289,7 @@ def main() -> int:
             if mcp_hcal is not None and hcal_measured > 0.0:
                 truth_e = mcp_hcal.getEnergy()
                 theta = mcp_theta(mcp_hcal)
-                ecal_corr = ecal_table.lookup(theta, ecal_measured) * ecal_measured
+                ecal_corr = apply_ecal_calibration(ecal_table, theta, ecal_measured)
                 target_hcal = truth_e - ecal_corr
                 if target_hcal > 0.0:
                     hcal_corr = hcal_table.lookup(theta, hcal_measured) * hcal_measured

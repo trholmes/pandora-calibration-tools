@@ -13,6 +13,8 @@
 --ecal-fraction-min 0.7
 --ecal-barrel-collection ECalBarrelCollection
 --ecal-endcap-collection ECalEndcapCollection
---energy-axis truth
+--energy-basis em
+--ecal-to-em-gev 1.02373335516
+--energy-axis measured
 --estimator median
 --min-bin-count 20

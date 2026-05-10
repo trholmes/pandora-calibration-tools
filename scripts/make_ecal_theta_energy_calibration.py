@@ -38,6 +38,18 @@ def main() -> int:
     parser.add_argument("--ecal-barrel-collection", default="ECalBarrelCollection")
     parser.add_argument("--ecal-endcap-collection", default="ECalEndcapCollection")
     parser.add_argument(
+        "--energy-basis",
+        choices=["raw", "em"],
+        default="raw",
+        help="Energy basis used for ratios and energy-axis binning. Use 'em' for Pandora EM-branch calibration.",
+    )
+    parser.add_argument(
+        "--ecal-to-em-gev",
+        type=float,
+        default=1.0,
+        help="Raw ECAL energy to Pandora EM-branch scale factor used when --energy-basis em.",
+    )
+    parser.add_argument(
         "--energy-axis",
         choices=["measured"],
         default="measured",
@@ -93,22 +105,29 @@ def main() -> int:
                 cluster = get_best_cluster(event, args.cluster_collection)
                 if cluster is None:
                     continue
-                total, ecal_e, hcal_e, has_split = get_cluster_energy_split(
+                total, raw_ecal_energy, hcal_e, has_split = get_cluster_energy_split(
                     cluster, ecal_index=args.ecal_subdet_index, hcal_index=args.hcal_subdet_index
                 )
                 if args.skip_missing_subdet_split and not has_split:
                     events_skipped_split += 1
                     continue
-                ecal_fraction = (ecal_e / total) if total > 0.0 else 0.0
+                ecal_fraction = (raw_ecal_energy / total) if total > 0.0 else 0.0
                 if ecal_fraction < args.ecal_fraction_min:
                     events_skipped_fraction += 1
                     continue
-                ecal_measured = ecal_e
             else:
-                ecal_measured = (
+                raw_ecal_energy = (
                     sum_collection_energy(event, args.ecal_barrel_collection)
                     + sum_collection_energy(event, args.ecal_endcap_collection)
                 )
+
+            if raw_ecal_energy <= 0.0:
+                continue
+
+            ecal_measured = raw_ecal_energy
+            if args.energy_basis == "em":
+                ecal_measured *= args.ecal_to_em_gev
+
             if ecal_measured <= 0.0:
                 continue
 
@@ -149,6 +168,8 @@ def main() -> int:
             "skip_missing_subdet_split": bool(args.skip_missing_subdet_split),
             "ecal_collections": [args.ecal_barrel_collection, args.ecal_endcap_collection],
             "energy_axis": "measured",
+            "energy_basis": args.energy_basis,
+            "ecal_to_em_gev": args.ecal_to_em_gev,
             "runtime_sec": round(time.time() - t0, 3),
         },
     )

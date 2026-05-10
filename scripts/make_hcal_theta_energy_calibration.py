@@ -8,6 +8,7 @@ import time
 
 from calibration_lib import (
     add_common_args,
+    apply_ecal_calibration,
     build_table_from_ratios,
     expand_input_paths,
     find_bin,
@@ -137,8 +138,7 @@ def main() -> int:
             if hcal_measured <= 0.0:
                 continue
 
-            ecal_scale = ecal_table.lookup(theta, ecal_measured)
-            ecal_corrected = ecal_scale * ecal_measured
+            ecal_corrected = apply_ecal_calibration(ecal_table, theta, ecal_measured)
             target_hcal = truth_e - ecal_corrected
             if target_hcal <= 0.0:
                 if args.negative_target_policy == "skip":
