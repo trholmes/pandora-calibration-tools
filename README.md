@@ -390,6 +390,29 @@ This writes both:
 - `PandoraClusters` for the uncalibrated comparison collection
 - `PandoraClustersCalibrated` for the corrected comparison collection
 
+## Shower-Profile Diagnostics
+
+`scripts/plot_shower_profile_diagnostics.py` plots `showerProfileStart` and `showerProfileDiscrepancy` with the current `LCElectronId` cuts overlaid:
+
+```bash
+python3 scripts/plot_shower_profile_diagnostics.py reco.log \
+  --format dump-pfos-log \
+  --output-dir shower_profile_diagnostics
+```
+
+This log-parsing mode reads neutral PFO rows printed by `DumpPfosMonitoringAlgorithm`, where the columns are labelled `sStart` and `sDisc`. Charged PFO rows do not currently print these quantities, so for electron-specific studies either add those columns to the monitoring output or provide a CSV with columns:
+
+```text
+energy,sStart,sDisc,theta,label
+```
+
+`theta` and `label` are optional. The script writes:
+
+- `shower_profile_vs_energy.png`
+- `shower_profile_distributions.png`
+- `shower_profile_vs_theta.png` when `theta` is present
+- `shower_profile_summary.txt`
+
 ### 6) What to look for in the log
 
 You should see all of the following:
