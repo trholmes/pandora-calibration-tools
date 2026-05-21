@@ -94,8 +94,6 @@ export LD_LIBRARY_PATH="${MUCOL_BASE}/LCContent/install/lib:${MUCOL_BASE}/DDMarl
 export MARLIN_DLL="${MUCOL_BASE}/DDMarlinPandora/install/lib/libDDMarlinPandora.so:${MARLIN_DLL}"
 ```
 
-If your CMake install uses `lib64`, replace `lib` with `lib64` in `LCContent_DIR`, `LD_LIBRARY_PATH`, and `MARLIN_DLL`.
-
 ## Included Spec
 
 Full design/specification is included here:
