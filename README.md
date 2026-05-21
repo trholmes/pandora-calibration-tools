@@ -4,6 +4,11 @@ Standalone tooling to produce ECAL/HCAL theta-energy calibration tables and conv
 
 This repo is intentionally independent from your larger software stack so you can clone and run it inside your remote container.
 
+The logical process looks like this:
+- Use a large reconstructed dataset to create calibration factors using this github repo
+- Use the modified versions of the other repos described in this README to use those calibrations when running the reconstruction step on simulated data
+- Use flags in the PandoraSettingsDefault file to turn on and off the use of the calibration in the cluster merging step and in the E/p comparison for ElectronID (the output energies will always be calibrated if you hand it the files)
+
 Default calibration source in scripts is **cluster-based** (`PandoraClusters`) using cluster subdetector energy split:
 - ECAL subdetector index: `0`
 - HCAL subdetector index: `1`
