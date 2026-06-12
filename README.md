@@ -219,9 +219,9 @@ The values passed to the calibration scripts must match the values used by `Stee
 | Steering parameter | Current value | Calibration-script argument |
 | --- | --- | --- |
 | `ECalToEMGeVCalibration` | `1.02373335516` | `--ecal-to-em-gev 1.02373335516` |
-| `ECalToHadGeVCalibrationBarrel` | `1.24223718397` | `--ecal-to-had-gev 1.24223718397` |
-| `ECalToHadGeVCalibrationEndCap` | `1.24223718397` | `--ecal-to-had-gev 1.24223718397` |
-| `HCalToHadGeVCalibration` | `1.01799349172` | `--hcal-to-had-gev 1.01799349172` |
+| `ECalToHadGeVCalibrationBarrel` | `1.38` | `--ecal-to-had-gev 1.38` |
+| `ECalToHadGeVCalibrationEndCap` | `1.38` | `--ecal-to-had-gev 1.38` |
+| `HCalToHadGeVCalibration` | `1.25` | `--hcal-to-had-gev 1.25` |
 
 Do not treat these as universal detector constants. If `steer_reco.py` changes, update the calibration commands and regenerate the payloads. A mismatch double-counts or under-counts a flat scale factor: the table is trained in one energy basis, while Pandora applies it in another.
 
@@ -265,8 +265,8 @@ python3 scripts/make_hcal_theta_energy_calibration.py \
   --skip-missing-subdet-split \
   --hcal-fraction-min 0.1 \
   --energy-basis hadronic \
-  --ecal-to-had-gev 1.24223718397 \
-  --hcal-to-had-gev 1.01799349172 \
+  --ecal-to-had-gev 1.38 \
+  --hcal-to-had-gev 1.25 \
   --theta-bins 0,0.35,0.7,1.05,1.4,1.75,2.1,2.45,2.8,3.14159 \
   --energy-bins 0,5,10,20,50,100,200,500,1000,5000 \
   --pdg-ids 2112,211,111 \
