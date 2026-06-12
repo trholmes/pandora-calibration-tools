@@ -346,23 +346,65 @@ k4run "${MUCOL_BASE}/SteeringMacros/k4Reco/steer_reco.py" \
   --hadronicCalibPayload "${MUCOL_BASE}/pandora-calibration-tools/calib/hadronic_calib_payload.json"
 ```
 
-## Runtime Switches In SteeringMacros
+## Payloads And Runtime Switches
 
-The current `SteeringMacros/PandoraSettings/PandoraSettingsDefault.xml` exposes these switches:
+There are two separate runtime controls:
 
-```xml
-<UseCorrectedHadronicEnergyForTrackComparison>false</UseCorrectedHadronicEnergyForTrackComparison>
+1. Payload arguments to `steer_reco.py` load calibration tables into the Pandora correction plugins.
+2. XML switches in `SteeringMacros/PandoraSettings/PandoraSettingsDefault.xml` decide whether selected internal comparisons use corrected energies instead of the nominal cluster energies.
+
+Loading a payload changes the corrected-energy value returned by Pandora. It does not automatically make every internal algorithm use that corrected energy. The XML switches below opt specific decisions into using corrected energies.
+
+If a switch is turned on without the matching payload, the correction plugin is still registered but has an empty correction table. In that case `GetCorrectedElectromagneticEnergy(...)` and `GetCorrectedHadronicEnergy(...)` fall back to the nominal calibrated cluster energy. This should be safe and effectively identity-like. If the runtime branches are not built or the plugin names in XML are missing from the loaded `LCContent`, Pandora can still fail at initialization.
+
+### Payload Arguments
+
+```bash
+--photonEMCalibPayload calib/photon_em_calib_payload.json
 ```
 
-inside `ConeBasedMerging`. When true, ConeBasedMerging track-cluster chi checks use corrected parent and merged-candidate hadronic energies. When false, they use the original `GetHadronicEnergy()` behavior.
+Loads the EM theta-energy table and enables the `PhotonEMNonLinearity` electromagnetic correction plugin. This affects corrected EM energies and final photon/EM energy assignment, and it is used by internal comparisons only where an EM corrected-energy switch is enabled.
 
-```xml
-<LCElectronId>
-    <UseCorrectedElectromagneticEnergyForEOverP>false</UseCorrectedElectromagneticEnergyForEOverP>
-</LCElectronId>
+```bash
+--hadronicCalibPayload calib/hadronic_calib_payload.json
 ```
 
-When true, the `LCElectronId` E/p comparison uses `GetCorrectedElectromagneticEnergy(...)`. The fast profile and preselection cuts remain unchanged.
+Loads the hadronic theta-energy table and enables the `HadronicThetaEnergyBinned` hadronic correction plugin. This affects corrected HAD energies and final hadronic energy assignment, and it is used by internal comparisons only where a HAD corrected-energy switch is enabled.
+
+### XML Switches
+
+All switches default to `false` in the steering. Set only the specific comparisons you want to test to `true`.
+
+| XML location | Switch | Effect when `true` |
+| --- | --- | --- |
+| `ProximityBasedMerging` | `UseCorrectedHadronicEnergyForTrackComparison` | The proximity-merging track-cluster chi checks use corrected parent and merged-candidate hadronic energies. |
+| `ConeBasedMerging` | `UseCorrectedHadronicEnergyForTrackComparison` | The cone-merging track-cluster chi checks use corrected parent and merged-candidate hadronic energies. |
+| nested `TrackClusterAssociation` inside `ProximityBasedMerging` | `UseCorrectedHadronicEnergyForTrackComparison` | The association energy tie-break uses corrected hadronic energy. Distance remains the primary comparison. |
+| nested `TrackClusterAssociation` inside `ConeBasedMerging` | `UseCorrectedHadronicEnergyForTrackComparison` | The association energy tie-break uses corrected hadronic energy. Distance remains the primary comparison. |
+| `TrackPreparation/trackClusterAssociationAlgorithms/TrackClusterAssociation` | `UseCorrectedHadronicEnergyForTrackComparison` | The final track-cluster association energy tie-break uses corrected hadronic energy. Distance remains the primary comparison. |
+| `LCElectronId` | `UseCorrectedElectromagneticEnergyForEOverP` | The electron-ID E/p comparison uses corrected electromagnetic energy. Fast profile and preselection cuts remain unchanged. |
+
+The hadronic switch name is reused in different XML scopes. For example, this turns on the `TrackClusterAssociation` tie-break inside `ConeBasedMerging`, not the `ConeBasedMerging` chi checks:
+
+```xml
+<algorithm type = "ConeBasedMerging">
+    <algorithm type = "TrackClusterAssociation">
+        <UseCorrectedHadronicEnergyForTrackComparison>true</UseCorrectedHadronicEnergyForTrackComparison>
+    </algorithm>
+    <UseCorrectedHadronicEnergyForTrackComparison>false</UseCorrectedHadronicEnergyForTrackComparison>
+</algorithm>
+```
+
+This turns on the `ConeBasedMerging` chi checks, not the nested association tie-break:
+
+```xml
+<algorithm type = "ConeBasedMerging">
+    <algorithm type = "TrackClusterAssociation">
+        <UseCorrectedHadronicEnergyForTrackComparison>false</UseCorrectedHadronicEnergyForTrackComparison>
+    </algorithm>
+    <UseCorrectedHadronicEnergyForTrackComparison>true</UseCorrectedHadronicEnergyForTrackComparison>
+</algorithm>
+```
 
 ## Shower-Profile Diagnostics
 
