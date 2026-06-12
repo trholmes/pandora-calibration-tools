@@ -1,21 +1,70 @@
 # pandora-calibration-tools
 
-Standalone tooling to produce ECAL/HCAL theta-energy calibration tables and convert them into a `DDMarlinPandora.Parameters` payload.
+Standalone tools for producing Pandora theta-energy calibration payloads and diagnostic plots for the MAIA reconstruction workflow.
 
-This repo is intentionally independent from your larger software stack so you can clone and run it inside your remote container.
+The current workflow targets the `v2.11` MAIA setup and the calibration branches in:
 
-The logical process looks like this:
-- Use a large reconstructed dataset to create calibration factors using this github repo
-- Use the modified versions of the other repos described in this README to use those calibrations when running the reconstruction step on simulated data
-- Use flags in the PandoraSettingsDefault file to turn on and off the use of the calibration in the cluster merging step and in the E/p comparison for ElectronID (the output energies will always be calibrated if you hand it the files)
+- `trholmes/LCContent`: `codex/photon-em-nonlinearity`
+- `trholmes/DDMarlinPandora`: `codex/photon-em-theta-energy`
+- `trholmes/SteeringMacros`: `codex/photon-em-steering`
+- `trholmes/pandora-calibration-tools`: `codex/photon-em-payload`
 
-Default calibration source in scripts is **cluster-based** (`PandoraClusters`) using cluster subdetector energy split:
+The logical workflow is:
+
+1. Use reconstructed single-particle samples to create calibration factors with this repository.
+2. Use the matching runtime branches above to apply those calibrations during reconstruction.
+3. Use switches in `PandoraSettingsDefault.xml` to control whether corrected energies are used in selected internal decisions, such as ConeBasedMerging track comparisons and `LCElectronId` E/p.
+4. Final output cluster energies are calibrated when the corresponding payloads are supplied to `steer_reco.py`.
+
+Default training inputs are cluster-based `PandoraClusters` from reco `.slcio` files. The scripts use `cluster.getSubdetectorEnergies()` with:
+
 - ECAL subdetector index: `0`
 - HCAL subdetector index: `1`
 
-## Fresh MAIA Checkout For Calibration Development
+Examples below use one consistent EM sample and one consistent hadronic sample:
 
-Use this for a clean checkout in a new MAIA software area, e.g. `/scratch/trholmes/mucol/v2.11`.
+- EM/photon sample: `photonGun_E_0_50`
+- hadronic sample: `neutronGun_E_0_50`
+
+## What This Workflow Covers
+
+This repository provides the scripts and documentation for:
+
+1. Photon/ECAL EM theta-energy calibration.
+2. Branch-summed hadronic theta-energy calibration using ECAL+HCAL on the Pandora HAD scale.
+3. DDMarlinPandora steering payload generation.
+4. Closure and shower-profile diagnostic plots.
+
+The matching runtime code lives in the companion branches listed above. In particular:
+
+- `LCContent` implements the theta-energy nonlinearity plugin and configurable corrected-energy use in selected comparisons.
+- `DDMarlinPandora` exposes calibration payload parameters and registers the plugins.
+- `SteeringMacros` enables the plugin names in Pandora XML and loads payload JSON files from `steer_reco.py`.
+
+## Repository Contents
+
+- `scripts/make_ecal_theta_energy_calibration.py`: build photon/ECAL EM calibration tables.
+- `scripts/make_hcal_theta_energy_calibration.py`: build hadronic calibration tables.
+- `scripts/validate_theta_energy_calibration.py`: closure plots and summaries.
+- `scripts/build_theta_energy_steering_payload.py`: convert calibration tables to `DDMarlinPandora.Parameters` payloads.
+- `scripts/plot_shower_profile_diagnostics.py`: plot `showerProfileStart` and `showerProfileDiscrepancy` diagnostics.
+- `scripts/calibration_lib.py`: shared utilities.
+- `config/example_ecal_calibration_config.txt`: example ECAL command config.
+- `config/example_hcal_calibration_config.txt`: example hadronic command config.
+- `docs/theta_energy_cluster_calibration_spec.md`: implementation/spec notes.
+
+## Runtime Requirements
+
+- MAIA `v2.11` software environment.
+- Python 3.8+.
+- `pyLCIO` for calibration-table production.
+- `matplotlib` for `plot_shower_profile_diagnostics.py`.
+- `.slcio` reco inputs for `photonGun_E_0_50` and `neutronGun_E_0_50`.
+- Writable output directory, normally `calib/`.
+
+## Set Up From Scratch
+
+Use this for a clean checkout in a new `v2.11` area.
 
 ```bash
 export MUCOL_BASE=/scratch/trholmes/mucol/v2.11
@@ -23,7 +72,7 @@ mkdir -p "${MUCOL_BASE}"
 cd "${MUCOL_BASE}"
 ```
 
-Clone the runtime repositories and this calibration-tool repository:
+Clone the repositories:
 
 ```bash
 git clone git@github.com:PandoraPFA/LCContent.git
@@ -32,31 +81,21 @@ git clone https://github.com/madbaron/SteeringMacros.git
 git clone git@github.com:trholmes/pandora-calibration-tools.git
 ```
 
-Add the fork remotes used by the calibration branches:
+Add the fork remotes and check out the working branches:
 
 ```bash
 cd "${MUCOL_BASE}/LCContent"
 git remote add trholmes git@github.com:trholmes/LCContent.git
-
-cd "${MUCOL_BASE}/DDMarlinPandora"
-git remote add trholmes git@github.com:trholmes/DDMarlinPandora.git
-
-cd "${MUCOL_BASE}/SteeringMacros"
-git remote add trholmes git@github.com:trholmes/SteeringMacros.git
-```
-
-Check out the photon EM calibration branches:
-
-```bash
-cd "${MUCOL_BASE}/LCContent"
 git fetch trholmes codex/photon-em-nonlinearity
 git checkout codex/photon-em-nonlinearity
 
 cd "${MUCOL_BASE}/DDMarlinPandora"
+git remote add trholmes git@github.com:trholmes/DDMarlinPandora.git
 git fetch trholmes codex/photon-em-theta-energy
 git checkout codex/photon-em-theta-energy
 
 cd "${MUCOL_BASE}/SteeringMacros"
+git remote add trholmes git@github.com:trholmes/SteeringMacros.git
 git fetch trholmes codex/photon-em-steering
 git checkout codex/photon-em-steering
 
@@ -65,7 +104,7 @@ git fetch origin codex/photon-em-payload
 git checkout codex/photon-em-payload
 ```
 
-Build and install local `LCContent` and `DDMarlinPandora`:
+Build and install local `LCContent`:
 
 ```bash
 cd "${MUCOL_BASE}/LCContent"
@@ -75,7 +114,11 @@ cd build
 cmake .. -DCMAKE_INSTALL_PREFIX="${MUCOL_BASE}/LCContent/install"
 cmake --build . -j"$(nproc)"
 cmake --install .
+```
 
+Build and install local `DDMarlinPandora` against that `LCContent`:
+
+```bash
 cd "${MUCOL_BASE}/DDMarlinPandora"
 rm -rf build install
 mkdir -p build install
@@ -87,74 +130,100 @@ cmake --build . -j"$(nproc)"
 cmake --install .
 ```
 
-Point runtime at those local builds before running `k4run`:
+Point runtime to the local builds before running `k4run`:
 
 ```bash
 export LD_LIBRARY_PATH="${MUCOL_BASE}/LCContent/install/lib:${MUCOL_BASE}/DDMarlinPandora/install/lib:${LD_LIBRARY_PATH}"
 export MARLIN_DLL="${MUCOL_BASE}/DDMarlinPandora/install/lib/libDDMarlinPandora.so:${MARLIN_DLL}"
 ```
 
-## Included Spec
-
-Full design/specification is included here:
-
-- `docs/theta_energy_cluster_calibration_spec.md`
-
-Recommended read order:
-1. This README (operational workflow)
-2. `docs/theta_energy_cluster_calibration_spec.md` (design + integration details)
-
-## What This Repo Does
-
-1. Produces ECAL calibration table (pass A) from photon samples.
-2. Produces HCAL calibration table (pass B) using fixed ECAL table.
-3. Produces closure summary (pass C).
-4. Builds ready-to-paste steering payload for `DDMarlinPandora.Parameters`.
-
-## What This Repo Does Not Do
-
-1. It does not patch or build `DDMarlinPandora`/`LCContent`.
-2. It does not automatically modify `SteeringMacros/k4Reco/steer_reco.py`.
-3. It does not by itself enable mid-Pandora correction until matching code changes are merged in `LCContent` + `DDMarlinPandora`.
-
-## Repository Contents
-
-- `scripts/make_ecal_theta_energy_calibration.py`
-- `scripts/make_hcal_theta_energy_calibration.py`
-- `scripts/validate_theta_energy_calibration.py`
-- `scripts/build_theta_energy_steering_payload.py`
-- `scripts/calibration_lib.py`
-- `config/example_ecal_calibration_config.txt`
-- `config/example_hcal_calibration_config.txt`
-- `docs/theta_energy_cluster_calibration_spec.md`
-
-## Runtime Requirements
-
-- Python 3.8+
-- `pyLCIO` available in environment
-- `.slcio` reco files
-- Write access to output directory (e.g. `calib/`)
-
-## Expected Remote Layout
-
-Example (your current container layout):
-
-- `/scratch/trholmes/mucol/v2.9.7/SteeringMacros`
-- `/scratch/trholmes/mucol/v2.9.7/MyBIBUtils`
-- `/scratch/trholmes/mucol/v2.9.7/pandora-calibration-tools` (this repo)
-
-## End-to-End Workflow
-
-### 0) Prepare output dir
+Check that the local runtime is active:
 
 ```bash
-cd /scratch/trholmes/mucol/v2.9.7/pandora-calibration-tools
-mkdir -p calib
+echo "${LD_LIBRARY_PATH}" | tr ':' '\n' | head -n 5
+echo "${MARLIN_DLL}" | tr ':' '\n' | head -n 10
 ```
 
-### 1) Pass A: build ECAL table
+## Set Up Upon Return
 
-For photon EM corrections, build the ECAL table in the Pandora EM energy basis. The raw ECAL subdetector energy from `cluster.getSubdetectorEnergies()` is multiplied by the same `ECalToEMGeVCalibration` factor used by `DDMarlinPandora` before ratios and energy-axis binning are computed.
+Use this when coming back to an existing `v2.11` checkout.
+
+```bash
+export MUCOL_BASE=/scratch/trholmes/mucol/v2.11
+```
+
+Update the branches:
+
+```bash
+cd "${MUCOL_BASE}/LCContent"
+git fetch trholmes codex/photon-em-nonlinearity
+git checkout codex/photon-em-nonlinearity
+git pull --ff-only trholmes codex/photon-em-nonlinearity
+
+cd "${MUCOL_BASE}/DDMarlinPandora"
+git fetch trholmes codex/photon-em-theta-energy
+git checkout codex/photon-em-theta-energy
+git pull --ff-only trholmes codex/photon-em-theta-energy
+
+cd "${MUCOL_BASE}/SteeringMacros"
+git fetch trholmes codex/photon-em-steering
+git checkout codex/photon-em-steering
+git pull --ff-only trholmes codex/photon-em-steering
+
+cd "${MUCOL_BASE}/pandora-calibration-tools"
+git fetch origin codex/photon-em-payload
+git checkout codex/photon-em-payload
+git pull --ff-only origin codex/photon-em-payload
+```
+
+Rebuild after `LCContent` or `DDMarlinPandora` changes:
+
+```bash
+cd "${MUCOL_BASE}/LCContent/build"
+cmake --build . -j"$(nproc)"
+cmake --install .
+
+cd "${MUCOL_BASE}/DDMarlinPandora/build"
+cmake --build . -j"$(nproc)"
+cmake --install .
+```
+
+Re-export the local runtime libraries in each new shell:
+
+```bash
+export LD_LIBRARY_PATH="${MUCOL_BASE}/LCContent/install/lib:${MUCOL_BASE}/DDMarlinPandora/install/lib:${LD_LIBRARY_PATH}"
+export MARLIN_DLL="${MUCOL_BASE}/DDMarlinPandora/install/lib/libDDMarlinPandora.so:${MARLIN_DLL}"
+```
+
+## Calibration Inputs And Conventions
+
+The calibration scripts train on reconstructed clusters and compare to the matched generated particle energy.
+
+The EM/photon table is trained in the Pandora EM energy basis:
+
+```text
+E_em_basis = raw_ecal_subdetector_energy * ECalToEMGeVCalibration
+```
+
+The first-pass hadronic table is trained in a branch-summed Pandora HAD energy basis:
+
+```text
+E_had_basis = raw_ecal_subdetector_energy * ECalToHadGeVCalibration
+            + raw_hcal_subdetector_energy * HCalToHadGeVCalibration
+```
+
+This is why the examples below explicitly pass the flat ECAL/HCAL calibration constants. They make the table training basis match the basis where the Pandora runtime correction is applied.
+
+## End-To-End Calibration Workflow
+
+Prepare output directories:
+
+```bash
+cd "${MUCOL_BASE}/pandora-calibration-tools"
+mkdir -p calib calib/plots
+```
+
+### 1. Build The Photon/ECAL EM Table
 
 ```bash
 python3 scripts/make_ecal_theta_energy_calibration.py \
@@ -172,13 +241,11 @@ python3 scripts/make_ecal_theta_energy_calibration.py \
   --output calib/ecal_theta_energy_calib.json
 ```
 
-### 2) Pass B: build HCAL table (ECAL fixed)
-
-For the first-pass hadronic branch test, train one branch-summed hadronic table. The raw ECAL and HCAL subdetector energies are converted to the Pandora HAD energy basis before ratios and energy-axis binning are computed.
+### 2. Build The Hadronic Branch Table
 
 ```bash
 python3 scripts/make_hcal_theta_energy_calibration.py \
-  --inputs /scratch/trholmes/mucol/data/reco/neutronGun_E_250_1000 \
+  --inputs /scratch/trholmes/mucol/data/reco/neutronGun_E_0_50 \
   --recursive \
   --energy-source clusters \
   --cluster-collection PandoraClusters \
@@ -193,9 +260,23 @@ python3 scripts/make_hcal_theta_energy_calibration.py \
   --output calib/hadronic_theta_energy_calib.json
 ```
 
-### 3) Pass C: closure summary
+### 3. Validate Closure
 
-For the first-pass hadronic branch table, validate the single hadronic table directly:
+Validate the photon/ECAL table:
+
+```bash
+python3 scripts/validate_theta_energy_calibration.py \
+  --ecal-inputs /scratch/trholmes/mucol/data/reco/photonGun_E_0_50 \
+  --recursive \
+  --energy-source clusters \
+  --cluster-collection PandoraClusters \
+  --skip-missing-subdet-split \
+  --ecal-calibration calib/ecal_theta_energy_calib.json \
+  --plot-dir calib/plots \
+  --output calib/ecal_closure_summary.json
+```
+
+Validate the first-pass hadronic branch table:
 
 ```bash
 python3 scripts/validate_theta_energy_calibration.py \
@@ -209,72 +290,11 @@ python3 scripts/validate_theta_energy_calibration.py \
   --output calib/hadronic_closure_summary.json
 ```
 
-The older ECAL+HCAL component-closure mode is still available:
+The validation scripts write quick-look maps and theta profiles to `calib/plots`.
 
-```bash
-python3 scripts/validate_theta_energy_calibration.py \
-  --ecal-inputs /data/fmeloni/DataMuC_MAIA_v0/v6/reco/photonGun_E_0_50 \
-  --hcal-inputs /data/fmeloni/DataMuC_MAIA_v0/v6/reco/neutronGun_E_0_50 \
-  --recursive \
-  --energy-source clusters \
-  --cluster-collection PandoraClusters \
-  --skip-missing-subdet-split \
-  --ecal-calibration calib/ecal_theta_energy_calib.json \
-  --hcal-calibration calib/hcal_theta_energy_calib.json \
-  --plot-dir calib/plots \
-  --output calib/calibration_closure_summary.json
-```
+### 4. Build Steering Payloads
 
-This also writes quick-look calibration plots when `--plot-dir` is provided:
-- `ecal_scale_map.png`, `hcal_scale_map.png`
-- `ecal_count_map.png`, `hcal_count_map.png`
-- `ecal_theta_profiles.png`, `hcal_theta_profiles.png`
-- plus ROOT files with the same histograms
-
-### 4) Build steering payload
-
-```bash
-python3 scripts/build_theta_energy_steering_payload.py \
-  --ecal-calibration calib/ecal_theta_energy_calib.json \
-  --hcal-calibration calib/hcal_theta_energy_calib.json \
-  --output-json calib/theta_energy_ddmarlin_params.json \
-  --output-python calib/theta_energy_ddmarlin_params.py
-```
-
-This produces:
-
-- `calib/theta_energy_ddmarlin_params.json`
-- `calib/theta_energy_ddmarlin_params.py`
-
-`*.py` contains a block like:
-
-```python
-theta_energy_calibration_params = {...}
-DDMarlinPandora.Parameters.update(theta_energy_calibration_params)
-```
-
-For the first-pass hadronic branch runtime test, build a single-table hadronic payload:
-
-```bash
-python3 scripts/build_theta_energy_steering_payload.py \
-  --hadronic-calibration calib/hadronic_theta_energy_calib.json \
-  --output-json calib/hadronic_calib_payload.json
-```
-
-Pass it to reconstruction with:
-
-```bash
-k4run /scratch/trholmes/mucol/v2.11/SteeringMacros/k4Reco/steer_reco.py \
-  --code /scratch/trholmes/mucol/v2.11 \
-  --data /scratch/trholmes/mucol/v2.11 \
-  --TypeEvent neutronGun_E_0_50 \
-  --InFileName 0 \
-  --hadronicCalibPayload /scratch/trholmes/mucol/v2.11/pandora-calibration-tools/calib/hadronic_calib_payload.json
-```
-
-### Photon EM payload
-
-For the photon-focused EM correction path, build a single-table payload from the ECAL/photon calibration:
+Build the photon EM runtime payload:
 
 ```bash
 python3 scripts/build_theta_energy_steering_payload.py \
@@ -282,116 +302,67 @@ python3 scripts/build_theta_energy_steering_payload.py \
   --output-json calib/photon_em_calib_payload.json
 ```
 
-Then pass it to reconstruction:
+Build the hadronic runtime payload:
 
 ```bash
-k4run /scratch/trholmes/mucol/v2.9.7/SteeringMacros/k4Reco/steer_reco.py \
-  --code /scratch/trholmes/mucol/v2.9.7 \
-  --data /scratch/trholmes/mucol/v2.9.7 \
+python3 scripts/build_theta_energy_steering_payload.py \
+  --hadronic-calibration calib/hadronic_theta_energy_calib.json \
+  --output-json calib/hadronic_calib_payload.json
+```
+
+## Run Reconstruction With Payloads
+
+Photon EM test:
+
+```bash
+k4run "${MUCOL_BASE}/SteeringMacros/k4Reco/steer_reco.py" \
+  --code "${MUCOL_BASE}" \
+  --data "${MUCOL_BASE}" \
   --TypeEvent photonGun_E_0_50 \
   --InFileName 0 \
-  --photonEMCalibPayload /scratch/trholmes/mucol/v2.9.7/pandora-calibration-tools/calib/photon_em_calib_payload.json
+  --photonEMCalibPayload "${MUCOL_BASE}/pandora-calibration-tools/calib/photon_em_calib_payload.json"
 ```
 
-## Rebuild And Run After Updates
-
-Use this when you have updated any of the three runtime repos:
-
-- `trholmes/LCContent`
-- `trholmes/DDMarlinPandora`
-- `trholmes/SteeringMacros`
-
-The commands below assume this container layout:
-
-- `/scratch/trholmes/mucol/v2.9.7/LCContent`
-- `/scratch/trholmes/mucol/v2.9.7/DDMarlinPandora`
-- `/scratch/trholmes/mucol/v2.9.7/SteeringMacros`
-- `/scratch/trholmes/mucol/v2.9.7/pandora-calibration-tools`
-
-### 1) Pull the current branches
+Hadronic branch test:
 
 ```bash
-cd /scratch/trholmes/mucol/v2.9.7/LCContent
-git fetch trholmes codex/theta-energy-binned-plugin
-git checkout codex/theta-energy-binned-plugin
-git pull --ff-only trholmes codex/theta-energy-binned-plugin
-
-cd /scratch/trholmes/mucol/v2.9.7/DDMarlinPandora
-git fetch trholmes codex/theta-energy-params-plumbing
-git checkout codex/theta-energy-params-plumbing
-git pull --ff-only trholmes codex/theta-energy-params-plumbing
-
-cd /scratch/trholmes/mucol/v2.9.7/SteeringMacros
-git fetch trholmes codex/ecal-3d-precalib
-git checkout codex/ecal-3d-precalib
-git pull --ff-only trholmes codex/ecal-3d-precalib
+k4run "${MUCOL_BASE}/SteeringMacros/k4Reco/steer_reco.py" \
+  --code "${MUCOL_BASE}" \
+  --data "${MUCOL_BASE}" \
+  --TypeEvent neutronGun_E_0_50 \
+  --InFileName 0 \
+  --hadronicCalibPayload "${MUCOL_BASE}/pandora-calibration-tools/calib/hadronic_calib_payload.json"
 ```
 
-### 2) Rebuild and install `LCContent`
+Combined photon/hadronic payload test:
 
 ```bash
-cd /scratch/trholmes/mucol/v2.9.7/LCContent
-mkdir -p build install
-cd build
-
-cmake .. \
-  -DCMAKE_INSTALL_PREFIX=/scratch/trholmes/mucol/v2.9.7/LCContent/install
-cmake --build . -j$(nproc)
-cmake --install .
-```
-
-If you already have a build directory and CMake cache from an older branch, it is safer to remove `build/` and configure again before rebuilding.
-
-### 3) Rebuild and install `DDMarlinPandora` against the local `LCContent`
-
-```bash
-cd /scratch/trholmes/mucol/v2.9.7/DDMarlinPandora
-mkdir -p build install
-cd build
-
-cmake .. \
-  -DCMAKE_INSTALL_PREFIX=/scratch/trholmes/mucol/v2.9.7/DDMarlinPandora/install \
-  -DLCContent_DIR=/scratch/trholmes/mucol/v2.9.7/LCContent/install/lib/cmake/LCContent
-cmake --build . -j$(nproc)
-cmake --install .
-```
-
-If your environment installs to `lib64` instead of `lib`, adjust the `LCContent_DIR`, `LD_LIBRARY_PATH`, and `MARLIN_DLL` paths below accordingly.
-
-### 4) Point runtime to the local libraries
-
-```bash
-export LD_LIBRARY_PATH=/scratch/trholmes/mucol/v2.9.7/LCContent/install/lib:/scratch/trholmes/mucol/v2.9.7/DDMarlinPandora/install/lib:$LD_LIBRARY_PATH
-export MARLIN_DLL=/scratch/trholmes/mucol/v2.9.7/DDMarlinPandora/install/lib/libDDMarlinPandora.so:$MARLIN_DLL
-```
-
-Sanity checks:
-
-```bash
-echo "$LD_LIBRARY_PATH" | tr ':' '\n' | head -n 5
-echo "$MARLIN_DLL" | tr ':' '\n' | head -n 10
-```
-
-In the `k4run` log, `MyAIDAProcessor` should show your local:
-
-- `/scratch/trholmes/mucol/v2.9.7/DDMarlinPandora/install/lib/libDDMarlinPandora.so`
-
-### 5) Run reconstruction with the payload
-
-```bash
-k4run /scratch/trholmes/mucol/v2.9.7/SteeringMacros/k4Reco/steer_reco.py \
-  --code /scratch/trholmes/mucol/v2.9.7 \
-  --data /scratch/trholmes/mucol/v2.9.7 \
+k4run "${MUCOL_BASE}/SteeringMacros/k4Reco/steer_reco.py" \
+  --code "${MUCOL_BASE}" \
+  --data "${MUCOL_BASE}" \
   --TypeEvent photonGun_E_0_50 \
   --InFileName 0 \
-  --thetaEnergyCalibPayload /scratch/trholmes/mucol/v2.9.7/pandora-calibration-tools/calib/theta_energy_ddmarlin_params.json \
-  --writeClusterCalibrationComparison
+  --photonEMCalibPayload "${MUCOL_BASE}/pandora-calibration-tools/calib/photon_em_calib_payload.json" \
+  --hadronicCalibPayload "${MUCOL_BASE}/pandora-calibration-tools/calib/hadronic_calib_payload.json"
 ```
 
-This writes both:
+## Runtime Switches In SteeringMacros
 
-- `PandoraClusters` for the uncalibrated comparison collection
-- `PandoraClustersCalibrated` for the corrected comparison collection
+The current `SteeringMacros/PandoraSettings/PandoraSettingsDefault.xml` exposes these switches:
+
+```xml
+<UseCorrectedHadronicEnergyForTrackComparison>false</UseCorrectedHadronicEnergyForTrackComparison>
+```
+
+inside `ConeBasedMerging`. When true, ConeBasedMerging track-cluster chi checks use corrected parent and merged-candidate hadronic energies. When false, they use the original `GetHadronicEnergy()` behavior.
+
+```xml
+<LCElectronId>
+    <UseCorrectedElectromagneticEnergyForEOverP>false</UseCorrectedElectromagneticEnergyForEOverP>
+</LCElectronId>
+```
+
+When true, the `LCElectronId` E/p comparison uses `GetCorrectedElectromagneticEnergy(...)`. The fast profile and preselection cuts remain unchanged.
 
 ## Shower-Profile Diagnostics
 
@@ -400,10 +371,10 @@ This writes both:
 ```bash
 python3 scripts/plot_shower_profile_diagnostics.py reco.log \
   --format dump-pfos-log \
-  --output-dir shower_profile_diagnostics
+  --output-dir calib/shower_profile_diagnostics
 ```
 
-This log-parsing mode reads neutral PFO rows printed by `DumpPfosMonitoringAlgorithm`, where the columns are labelled `sStart` and `sDisc`. Charged PFO rows do not currently print these quantities, so for electron-specific studies either add those columns to the monitoring output or provide a CSV with columns:
+This log-parsing mode reads neutral PFO rows printed by `DumpPfosMonitoringAlgorithm`, where the columns are labelled `sStart` and `sDisc`. Charged PFO rows do not currently print these quantities. For electron-specific studies, either add those columns to the monitoring output or provide a CSV with columns:
 
 ```text
 energy,sStart,sDisc,theta,label
@@ -416,36 +387,22 @@ energy,sStart,sDisc,theta,label
 - `shower_profile_vs_theta.png` when `theta` is present
 - `shower_profile_summary.txt`
 
-### 6) What to look for in the log
+## Troubleshooting
 
-You should see all of the following:
+1. `ImportError: pyLCIO`
+   Source the MAIA software environment before running the calibration scripts.
 
-1. `Loaded theta-energy calibration payload ...`
-2. `Updated HadronicEnergyCorrectionPlugins in Pandora XML to include: ThetaEnergyBinned`
-3. `DDPandoraPFANewProcessor: loaded theta-energy correction tables for plugin 'ThetaEnergyBinned' ...`
+2. `No input files found`
+   Check the sample path and add `--recursive` if files are in nested directories.
 
-If those messages are missing, the local runtime override is usually not active.
+3. `LCContent_DIR` not found
+   Check that `${MUCOL_BASE}/LCContent/install/lib/cmake/LCContent` exists after installing `LCContent`.
 
-## Recommended Companion Repos
+4. Local changes do not appear in the `k4run` log
+   Re-export `LD_LIBRARY_PATH` and `MARLIN_DLL`, then check that `MARLIN_DLL` points at `${MUCOL_BASE}/DDMarlinPandora/install/lib/libDDMarlinPandora.so`.
 
-To make this whole chain testable end-to-end on remote:
+5. Too many calibration bins have scale `1.0`
+   Increase statistics, reduce bin granularity, or lower the minimum-bin threshold.
 
-1. `pandora-calibration-tools` (this repo) for table production.
-2. `trholmes/LCContent` fork for 2D ECAL/HCAL plugin implementation.
-3. `trholmes/DDMarlinPandora` fork for steering parameter plumbing.
-4. `trholmes/SteeringMacros` fork for runtime parameter injection.
-
-## Quick Troubleshooting
-
-1. `ImportError: pyLCIO`:
-   - source your MuonCollider/ILCSoft environment before running scripts.
-2. `No input files found`:
-   - check `--inputs` path and `--file-glob`,
-   - add `--recursive` when files are in nested subdirectories,
-   - for closure use `--ecal-inputs` and `--hcal-inputs` when ECAL and HCAL validation samples are in different directories.
-3. Too many bins with scale `1.0`:
-   - increase statistics or reduce bin granularity,
-   - lower `--min-bin-count`.
-4. Cluster split not available:
-   - if `PandoraClusters` in your file does not provide subdetector split, remove `--skip-missing-subdet-split` and test,
-   - or temporarily switch to `--energy-source hits` for debugging.
+6. Cluster subdetector split is unavailable
+   Remove `--skip-missing-subdet-split` to make the script fail loudly, or temporarily switch to hit-based energy inputs for debugging.
