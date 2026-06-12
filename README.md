@@ -214,6 +214,19 @@ E_had_basis = raw_ecal_subdetector_energy * ECalToHadGeVCalibration
 
 This is why the examples below explicitly pass the flat ECAL/HCAL calibration constants. They make the table training basis match the basis where the Pandora runtime correction is applied.
 
+The values passed to the calibration scripts must match the values used by `SteeringMacros/k4Reco/steer_reco.py` for the reconstruction that produced the input clusters and for the reconstruction where the payload will be applied. For the current `v2.11` steering, the relevant values are:
+
+| Steering parameter | Current value | Calibration-script argument |
+| --- | --- | --- |
+| `ECalToEMGeVCalibration` | `1.02373335516` | `--ecal-to-em-gev 1.02373335516` |
+| `ECalToHadGeVCalibrationBarrel` | `1.24223718397` | `--ecal-to-had-gev 1.24223718397` |
+| `ECalToHadGeVCalibrationEndCap` | `1.24223718397` | `--ecal-to-had-gev 1.24223718397` |
+| `HCalToHadGeVCalibration` | `1.01799349172` | `--hcal-to-had-gev 1.01799349172` |
+
+Do not treat these as universal detector constants. If `steer_reco.py` changes, update the calibration commands and regenerate the payloads. A mismatch double-counts or under-counts a flat scale factor: the table is trained in one energy basis, while Pandora applies it in another.
+
+The current hadronic script uses one ECAL-to-HAD value for both barrel and endcap, so the barrel and endcap values in steering should be identical for this workflow. If they are changed independently later, the calibration script or sample splitting should be updated before producing new hadronic payloads.
+
 ## End-To-End Calibration Workflow
 
 Prepare output directories:
