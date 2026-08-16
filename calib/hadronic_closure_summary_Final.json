@@ -1,0 +1,70 @@
+{
+  "created_unix": 1784300594,
+  "ecal_closure_truth_over_corrected": {
+    "mean": null,
+    "median": null,
+    "n": 0,
+    "stdev": null
+  },
+  "events_total_ecal": 0,
+  "events_total_hcal": 54897,
+  "files_ecal": 884,
+  "files_hcal": 884,
+  "hadronic_closure_truth_over_corrected": {
+    "mean": 1.1461460802045391,
+    "median": 1.0046551155724277,
+    "n": 49036,
+    "stdev": 1.0128116512512204
+  },
+  "hcal_closure_target_over_corrected": {
+    "mean": null,
+    "median": null,
+    "n": 0,
+    "stdev": null
+  },
+  "inputs": {
+    "cluster_collection": "PandoraClusters",
+    "ecal_calibration": null,
+    "ecal_inputs": [
+      "/scratch/jwatts/mucol/v2.11/reco_v2/pions_0_50",
+      "/scratch/jwatts/mucol/v2.11/reco_v2/pions_50_250",
+      "/scratch/jwatts/mucol/v2.11/reco_v2/pions_250_1000",
+      "/scratch/jwatts/mucol/v2.11/reco_v2/pions_1000_5000"
+    ],
+    "ecal_pdg_ids": [
+      22
+    ],
+    "ecal_subdet_index": 0,
+    "energy_source": "clusters",
+    "hadronic_calibration": "calib/hadronic_theta_energy_calib_Final.json",
+    "hcal_calibration": null,
+    "hcal_inputs": [
+      "/scratch/jwatts/mucol/v2.11/reco_v2/pions_0_50",
+      "/scratch/jwatts/mucol/v2.11/reco_v2/pions_50_250",
+      "/scratch/jwatts/mucol/v2.11/reco_v2/pions_250_1000",
+      "/scratch/jwatts/mucol/v2.11/reco_v2/pions_1000_5000"
+    ],
+    "hcal_pdg_ids": [
+      2112,
+      211,
+      111
+    ],
+    "hcal_subdet_index": 1,
+    "skip_missing_subdet_split": true
+  },
+  "plot_outputs": {
+    "hadronic": {
+      "count_map_png": "calib/plots/hadronic_count_map.png",
+      "root": "calib/plots/hadronic_calibration_plots.root",
+      "scale_map_png": "calib/plots/hadronic_scale_map.png",
+      "theta_profiles_png": "calib/plots/hadronic_theta_profiles.png"
+    }
+  },
+  "runtime_sec": 3561.858,
+  "total_closure_truth_over_corrected": {
+    "mean": null,
+    "median": null,
+    "n": 0,
+    "stdev": null
+  }
+}
